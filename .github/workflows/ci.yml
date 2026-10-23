@@ -42,7 +42,7 @@ jobs:
         with:
           version: ${{ env.OPA_VERSION }}
       - name: Rego 格式检查
-        run: opa fmt --diff policies
+        run: opa fmt --diff --fail policies
       - name: Rego 单测
         run: opa test policies -v
 

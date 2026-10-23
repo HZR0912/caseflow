@@ -4,12 +4,11 @@ import rego.v1
 
 # ---------------------------------------------------------------------------
 # 策略层的第一原则：fail-closed。
-# 输入缺字段、角色未登记、动作前缀没有匹配 —— 全部落到 default allow := false。
+# 缺少角色或动作、角色未登记、动作命名空间没有匹配时默认拒绝。
 # 这比"默认放行 + 黑名单"更难写错，也是面试里最容易被追问的一点。
 #
-# 内部规则统一以 _ 开头：Rego 的 _ 前缀规则不导出到决策文档，
-# 所以 /v1/data/caseflow/authz 只返回 {allow, reason}，
-# 不会把角色映射表这类内部结构泄露给调用方。
+# _ 前缀仅是命名约定；调用方只查询 /v1/data/caseflow/authz/decision，
+# 不查询包含辅助规则的整个包。
 # ---------------------------------------------------------------------------
 
 default allow := false
@@ -30,7 +29,10 @@ _self_escalation if {
 
 _role_permits if {
 	some prefix in _role_action_prefixes[input.user.role]
-	startswith(input.action, prefix)
+	startswith(input.action, concat("", [prefix, "."]))
+
+	# 每段必须是有效标识符：拒绝空动作、连续点和尾随点。
+	regex.match(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`, input.action)
 }
 
 allow if {

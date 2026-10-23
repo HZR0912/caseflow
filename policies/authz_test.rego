@@ -39,3 +39,21 @@ test_reason_is_reported if {
 test_decision_contract if {
 	authz.decision == {"allow": false, "reason": "self_escalation_forbidden"} with input as {"user": {"id": "u_3", "role": "intern"}, "action": "admin.grant", "resource": {"type": "account"}}
 }
+
+test_namespace_prefix_collision_denied if {
+	every action in ["codeevil.delete", "code_admin.grant", "ticketing.create"] {
+		authz.decision == {"allow": false, "reason": "role_not_permitted"} with input as {"user": {"id": "u_2", "role": "team_lead"}, "action": action, "resource": {"type": "repo"}}
+	}
+}
+
+test_malformed_actions_denied if {
+	every action in ["code", "code.", "code..delete", "code.delete.", "code. delete", "code.delete\n", "code./delete", "Code.delete", 42, null] {
+		not authz.allow with input as {"user": {"id": "u_2", "role": "team_lead"}, "action": action, "resource": {"type": "repo"}}
+	}
+}
+
+test_valid_namespace_actions_allowed if {
+	every action in ["code.invite_member", "code.repo.create", "ticket.create"] {
+		authz.allow with input as {"user": {"id": "u_2", "role": "team_lead"}, "action": action, "resource": {"type": "repo"}}
+	}
+}

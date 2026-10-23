@@ -14,39 +14,70 @@ W1（骨架周）的本地验证及 GitHub Actions 三个 job 均已通过，线
 
 | 验收项 | 状态 | 证据 |
 |---|---|---|
-| `docker compose up` 一条命令起服务 | ✅ | postgres / redis / opa / api 四个容器全部 `healthy` |
+| `docker compose --profile app up -d --build` 启动四个服务 | ✅ | postgres / redis / opa / api 四个容器全部 `healthy`；不带 profile 时仅启动前三个服务 |
 | CI 绿（ruff + pytest + `opa test`） | ✅ | [GitHub Actions 首次成功运行](https://github.com/HZR0912/caseflow/actions/runs/39906307840)：lint-and-test、policy、integration 三个 job 全部通过，含迁移往返和断点恢复集成测试 |
 | 能演示"策略拒绝一次请求" | ✅ | intern 请求 `admin.grant` → 403 `self_escalation_forbidden` |
-| （额外）跨进程断点恢复 | ✅ | `scripts/w1_checkpoint_demo.py start` 后杀进程，`resume` 从 checkpoint 跑完 |
+| 跨进程断点恢复 | ✅ | `start` 在审批断点后正常退出，另一个进程 `resume` 完成；另已实测 checkpoint 持久化后强杀进程再恢复 |
 
 已知缺口：执行器返回 501，因为幂等键 / 重试 / 补偿在 W7–W8；护栏、RAG、记忆、MockCorp、
 MCP 工具、审批台、Trace 回放、评测 harness 全部未开始。
 
 ## 快速开始
 
-```bash
-cp .env.example .env
-docker compose up -d              # postgres:5432 / redis:6379 / opa:8181
-uv sync --extra dev               # 安装依赖（含 dev 组）
-uv run alembic upgrade head       # 建表
+以下命令在仓库根目录的 **PowerShell** 中执行，需要 Python 3.12、uv、Docker。
+先安装依赖，再为演示生成一个随机 token；服务端只接收它的 SHA-256 摘要及 intern 身份映射。
+
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+uv sync --frozen --extra dev
+
+$token = uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
+$sha256 = [Security.Cryptography.SHA256]::Create()
+$tokenHash = -join ($sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($token)) | ForEach-Object { $_.ToString("x2") })
+$sha256.Dispose()
+$env:AUTH_CREDENTIALS = ConvertTo-Json -Compress -InputObject @(
+    @{ token_sha256 = $tokenHash; user_id = "u_intern"; role = "intern"; tenant = "demo" }
+)
+
+docker compose --profile app up -d --build
+uv run alembic upgrade head
+```
+
+健康检查通过后，在同一个 PowerShell 窗口验证：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/healthz
+$headers = @{ Authorization = "Bearer $token" }
+$body = @{ action = "admin.grant"; resource_type = "account" } | ConvertTo-Json -Compress
+Invoke-RestMethod http://127.0.0.1:8000/v1/policy/check -Method Post -Headers $headers -ContentType "application/json" -Body $body
+# HTTP 200，allow=false，reason=self_escalation_forbidden
+
+$body | curl.exe --silent --show-error -i http://127.0.0.1:8000/v1/actions/execute -H "Authorization: Bearer $token" -H "Content-Type: application/json" --data-binary "@-"
+# HTTP 403，detail.reason=self_escalation_forbidden
+```
+
+请求体只接收 `action`、`resource_type`、可选的 `resource_id`。
+`user_id`、`role`、`tenant` 从服务端凭据映射获取，放进请求体会返回 **422**。
+两个策略接口都要求 Bearer token：缺失、未知或未配置凭据时返回 **401**；健康检查无需认证。
+有效身份被策略拒绝返回 **403**（执行接口），策略放行后暂时返回 **501**（执行器尚未实现）。
+
+此演示的 `$token` 和 `$env:AUTH_CREDENTIALS` 只保存在当前 shell 中；新窗口需重新生成并重建 API 容器，
+或自行将摘要映射保存到不入库的 `.env`（`AUTH_CREDENTIALS` 为 JSON 数组）并妥善保管原始 token。
+撤销或更改角色需要修改服务端配置并重启 API。该机制是开发阶段的静态凭据映射，尚未接入企业 SSO，
+也不代表已实现租户资源隔离。设计取舍见 [ADR-0002](docs/design-decisions/0002-trusted-api-identity.md)。
+
+若需要本机热重载，在完成上述凭据配置后使用以下方式，避免同时运行容器 API 占用 8000 端口：
+
+```powershell
+docker compose --profile app stop api
+docker compose up -d              # 仅 postgres / redis / opa
+uv run alembic upgrade head
 uv run uvicorn apps.api.main:app --reload --port 8000
 ```
 
-也可以整栈跑（含 API 容器）：
-
-```bash
-docker compose --profile app up -d --build
-```
-
-验证：
-
-```bash
-curl http://127.0.0.1:8000/healthz
-curl -X POST http://127.0.0.1:8000/v1/policy/check \
-  -H 'content-type: application/json' \
-  -d '{"user":{"id":"u_1","role":"intern"},"action":"admin.grant","resource":{"type":"account"}}'
-# -> {"allow": false, "reason": "..."}
-```
+修改 `policies/*.rego` 后运行 `docker compose restart opa`，再验证策略结果。
+Windows Docker 的文件挂载不一定能把变更事件传给 `--watch`；`opa test` 读到新文件通过，
+不代表正在运行的 OPA 已加载新策略。
 
 跨进程断点恢复（W1 验收项之一）：
 

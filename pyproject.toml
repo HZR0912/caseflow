@@ -1,0 +1,52 @@
+[project]
+name = "caseflow"
+version = "0.1.0"
+description = "CaseFlow（事务官）— 企业办事与审批 Agent：可审批、可回滚、可审计的写操作平面"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "httpx>=0.27",
+    "psycopg[binary,pool]>=3.2",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "langgraph>=0.2",
+    "langgraph-checkpoint-postgres>=2.0",
+    "redis>=5.0",
+    "arq>=0.26",
+    "opentelemetry-api>=1.27",
+    "opentelemetry-sdk>=1.27",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "respx>=0.21",
+    "testcontainers[postgres,redis]>=4.8",
+    "ruff>=0.7",
+]
+
+[tool.uv]
+# 不是打包发布的库：apps/ core/ 作为顶层包，由 pytest 的 pythonpath 解析
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: 需要真实 postgres / opa 容器的集成测试（CI 里单独跑）",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["apps", "core", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
+ignore = ["B008"]  # FastAPI 依赖注入惯用写法

@@ -49,4 +49,9 @@ src = ["apps", "core", "tests", "scripts"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
-ignore = ["B008"]  # FastAPI 依赖注入惯用写法
+ignore = [
+    "B008",   # FastAPI 依赖注入惯用写法
+    "RUF001", # 中文注释里的全角标点会被判为 ambiguous unicode，中文项目必然误报
+    "RUF002",
+    "RUF003",
+]

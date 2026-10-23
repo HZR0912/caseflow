@@ -105,6 +105,9 @@ Code 邀请要求已有有效邮箱，席位上限按租户内不同成员计数
 - GET `/v1/state`：当前租户全部模拟状态、余额和规则，不含幂等收据或密码。
 - GET `/v1/{system}/{collection}`：`{"items":[...]}`。
 - GET `/v1/{system}/{collection}/{resource_id}`：资源对象，不存在返回 404。
+- GET `/v1/oplog?after_id=0&limit=100`：本租户**操作日志**，按 `id` 升序。
+  返回 `{"items":[...], "next_after_id": <id 或 null>}`；`next_after_id` 非空时表示还有下一页，
+  拿它当新的 `after_id` 继续拉即可。设计理由见 [ADR-0004](design-decisions/0004-mockcorp-oplog.md)。
 - collection：identity 下 users/mailboxes；code 下 repos/members；ticket 下 projects/tickets；money 下 orders/seats/refunds。
 - 数据与幂等收据在 PostgreSQL 同一事务提交，同租户写入串行；跨进程/重启仍可重放。
 - key 在租户内全局唯一，允许 1–200 个字母、数字、`.`、`_`、`:`、`-`；正式写入缺 key 返回 400。

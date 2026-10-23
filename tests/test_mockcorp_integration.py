@@ -37,6 +37,7 @@ def postgres_context():
         yield tenant, store, MockCorp(store, settings)
     finally:
         with psycopg.connect(store.url) as conn:
+            conn.execute("DELETE FROM mockcorp_oplog WHERE tenant = %s", (tenant,))
             conn.execute("DELETE FROM mockcorp_state WHERE tenant = %s", (tenant,))
 
 
@@ -97,8 +98,9 @@ def test_dry_run_and_exception_rollback_leave_no_rows(postgres_context):
         raise RuntimeError("failure before commit")
 
     with pytest.raises(RuntimeError):
-        store.transact(tenant, "failure", fail)
+        store.transact(tenant, "failure", fail, operation="identity.explode", actor="tester")
     with psycopg.connect(store.url) as conn:
+        # 业务与幂等收据必须无残留；日志表则**应当**留下记录（ADR-0004）。
         for table in ("mockcorp_state", "mockcorp_receipts"):
             assert (
                 conn.execute(f"SELECT count(*) FROM {table} WHERE tenant=%s", (tenant,)).fetchone()[
@@ -106,6 +108,31 @@ def test_dry_run_and_exception_rollback_leave_no_rows(postgres_context):
                 ]
                 == 0
             )
+        failures = conn.execute(
+            "SELECT operation, outcome, status_code, error_code, actor "
+            "FROM mockcorp_oplog WHERE tenant=%s ORDER BY id",
+            (tenant,),
+        ).fetchall()
+    assert failures == [("identity.explode", "error", 500, "internal_error", "tester")]
+
+
+def test_oplog_persists_across_connections_and_replays(postgres_context):
+    tenant, store, service = postgres_context
+    body = {"item": "editor", "quantity": 1, "unit_price_cents": 100}
+    first = service.execute(tenant, "money.create_order", body, key="log", actor="alice")
+    assert first.status == 201
+    replay = MockCorp(PostgresStore(store.url, store.settings)).execute(
+        tenant, "money.create_order", body, key="log", actor="alice"
+    )
+    assert replay.headers["Idempotency-Replayed"] == "true"
+
+    page = store.oplog(tenant)
+    committed, replayed = page["items"]
+    assert committed["outcome"] == "committed" and committed["replayed"] is False
+    assert replayed["outcome"] == "committed" and replayed["replayed"] is True
+    assert committed["result_id"] == replayed["result_id"]
+    assert committed["actor"] == "alice"
+    assert page["next_after_id"] is None
 
 
 def test_partial_success_survives_new_store(postgres_context):

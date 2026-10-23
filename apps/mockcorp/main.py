@@ -67,6 +67,7 @@ def write(service, subject, options, operation, body, **path) -> JSONResponse:
         key=options.key,
         dry_run=options.dry_run,
         fault=options.fault,
+        actor=subject.id,
     )
     return JSONResponse(reply.body, status_code=reply.status, headers=reply.headers)
 
@@ -92,6 +93,19 @@ def create_app(store: Store | None = None, settings: MockSettings | None = None)
     @app.get("/v1/state", tags=["inspection"])
     def state(subject: SubjectDep, service: ServiceDep):
         return service.store.snapshot(subject.tenant)
+
+    @app.get("/v1/oplog", tags=["inspection"])
+    def oplog(
+        subject: SubjectDep,
+        service: ServiceDep,
+        after_id: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    ):
+        """本租户的操作日志，按 id 升序。after_id 是增量游标，可反复拉取。
+
+        这是**供给方视角**的事实记录：Agent 说自己做了什么，可以拿这里交叉核对。
+        """
+        return service.store.oplog(subject.tenant, after_id=after_id, limit=limit)
 
     @app.get("/v1/{system}/{collection}", tags=["inspection"])
     def listing(system: str, collection: str, subject: SubjectDep, service: ServiceDep):

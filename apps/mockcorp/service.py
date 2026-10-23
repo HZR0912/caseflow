@@ -6,7 +6,7 @@ import time
 
 from apps.mockcorp.domain import BusinessError, apply
 from apps.mockcorp.models import MockSettings
-from apps.mockcorp.store import Outcome, Reply, Store
+from apps.mockcorp.store import LogEntry, Outcome, Reply, Store
 
 COMMON_FAULTS = {"500", "429", "timeout", "slow", "timeout_after_commit"}
 BUSINESS_FAULTS = {
@@ -28,6 +28,19 @@ def error_reply(status: int, code: str, *, retryable: bool = False) -> Reply:
     )
 
 
+def _result_id(result) -> str | None:
+    """从业务返回值里取资源 ID，只用于日志定位，不参与业务逻辑。
+
+    两种形状：业务函数的原始返回值（`{"id": ...}`），以及幂等收据里存的完整响应体
+    （`{"result": {"id": ...}, "diff": [...]}`）。
+    """
+    if isinstance(result, dict):
+        if isinstance(result.get("id"), str):
+            return result["id"]
+        return _result_id(result.get("result"))
+    return None
+
+
 class MockCorp:
     def __init__(self, store: Store, settings: MockSettings):
         self.store = store
@@ -42,6 +55,7 @@ class MockCorp:
         key: str | None,
         dry_run: bool = False,
         fault: str | None = None,
+        actor: str | None = None,
     ) -> Reply:
         if not dry_run and key is None:
             return error_reply(400, "idempotency_key_required")
@@ -60,9 +74,13 @@ class MockCorp:
             nonlocal delay, lost_response
             if receipt is not None:
                 if receipt["fingerprint"] != fingerprint:
-                    return Outcome(error_reply(409, "idempotency_key_conflict"))
+                    return Outcome(
+                        error_reply(409, "idempotency_key_conflict"),
+                        log=LogEntry(replayed=True, error_code="idempotency_key_conflict"),
+                    )
                 return Outcome(
-                    Reply(receipt["status"], receipt["body"], {"Idempotency-Replayed": "true"})
+                    Reply(receipt["status"], receipt["body"], {"Idempotency-Replayed": "true"}),
+                    log=LogEntry(replayed=True, result_id=_result_id(receipt["body"])),
                 )
             try:
                 if fault:
@@ -98,11 +116,17 @@ class MockCorp:
                     ),
                     persist=not dry_run,
                     fingerprint=fingerprint,
+                    log=LogEntry(dry_run=dry_run, result_id=_result_id(result)),
                 )
             except BusinessError as exc:
-                return Outcome(error_reply(exc.status, exc.code, retryable=exc.retryable))
+                return Outcome(
+                    error_reply(exc.status, exc.code, retryable=exc.retryable),
+                    log=LogEntry(dry_run=dry_run, error_code=exc.code),
+                )
 
-        reply = self.store.transact(tenant, None if dry_run else key, handle)
+        reply = self.store.transact(
+            tenant, None if dry_run else key, handle, operation=operation, actor=actor
+        )
         # 不在睡眠期间持有数据库锁；提交后响应丢失可由另一个请求立即重放恢复。
         if delay:
             time.sleep(self.settings.fault_delay_s)

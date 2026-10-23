@@ -111,6 +111,37 @@ services:
         condition: service_healthy
     logging: *default-logging
 
+  mockcorp:
+    profiles: ["mockcorp"]
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    container_name: caseflow-mockcorp
+    command:
+      - "sh"
+      - "-c"
+      - "uv run --no-sync alembic upgrade head && exec uv run --no-sync uvicorn apps.mockcorp.main:app --host 0.0.0.0 --port 8001"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-caseflow}:${POSTGRES_PASSWORD:-caseflow_dev_pw}@postgres:5432/${POSTGRES_DB:-caseflow}
+      AUTH_CREDENTIALS: ${AUTH_CREDENTIALS:-[]}
+      MOCKCORP_FAULTS_ENABLED: ${MOCKCORP_FAULTS_ENABLED:-false}
+      MOCKCORP_FAULT_DELAY_S: ${MOCKCORP_FAULT_DELAY_S:-1}
+      MOCKCORP_INITIAL_BALANCE_CENTS: ${MOCKCORP_INITIAL_BALANCE_CENTS:-100000}
+      MOCKCORP_CODE_SEAT_LIMIT: ${MOCKCORP_CODE_SEAT_LIMIT:-3}
+      MOCKCORP_ALLOWED_EMAIL_DOMAINS: ${MOCKCORP_ALLOWED_EMAIL_DOMAINS:-["example.com","mockcorp.test"]}
+    ports:
+      - "127.0.0.1:${MOCKCORP_PORT:-8001}:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *default-logging
+
 volumes:
   pgdata:
   redisdata:

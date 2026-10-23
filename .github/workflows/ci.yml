@@ -46,7 +46,7 @@ jobs:
       - name: Rego 单测
         run: opa test policies -v
 
-  # 3) 集成测试：真 postgres，验证迁移可 upgrade/downgrade、checkpoint 跨连接恢复。
+  # 3) 真 postgres：迁移往返、checkpoint 恢复、MockCorp 并发事务及 HTTP 超时重启。
   integration:
     runs-on: ubuntu-latest
     services:

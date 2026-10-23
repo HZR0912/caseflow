@@ -1,62 +1,61 @@
-# CaseFlow 架构（当前进度版）
+# CaseFlow 架构（W1–W2 实际进度）
 
-> 完整目标架构见 `../../CaseFlow-企业办事Agent-项目设计方案.md` §4。
-> 这里只画**已经存在**的东西，不做未来规划 —— 图里出现的东西必须是能跑通的代码。
+完整目标架构见 `../../CaseFlow-企业办事Agent-项目设计方案.md`。以下只列已有实现。
 
-## W1 实际落地的部分
+## 运行入口
 
-```
-                     ┌─────────────────────────────────────────┐
-  用户 / curl ──────▶│ apps/api/main.py (FastAPI)              │
-                     │  GET  /healthz                          │
-                     │  POST /v1/policy/check    只问策略      │
-                     │  POST /v1/actions/execute 策略门 → 403  │
-                     └───────┬──────────────────────┬──────────┘
-                             │                      │
-                    ┌────────▼─────────┐   ┌────────▼─────────────────┐
-                    │ core/policy/     │   │ core/graph/              │
-                    │ opa_client.py    │   │ demo_graph.py            │
-                    │ fail-closed 决策 │   │ echo→approval→report     │
-                    └────────┬─────────┘   └────────┬─────────────────┘
-                             │ HTTP /v1/data/...    │ checkpoint 读写
-                    ┌────────▼─────────┐   ┌────────▼─────────────────┐
-                    │ OPA 1.4.2        │   │ PostgreSQL 16 + pgvector │
-                    │ policies/*.rego  │   │ 业务表 + checkpoint 表   │
-                    │ --watch 热更新   │   │ (PostgresSaver)          │
-                    └──────────────────┘   └──────────────────────────┘
-                                                   ▲
-                                          Redis 7（已起，W7 接 Arq）
+```text
+用户 / curl → apps/api/main.py :8000
+               ├─ Bearer → 服务端身份映射
+               ├─ /v1/policy/check → core/policy/opa_client.py → OPA policies/*.rego
+               └─ /v1/actions/execute → 策略拒绝 403 / 允许后执行器暂返回 501
+
+scripts/w1_checkpoint_demo.py → core/graph/demo_graph.py
+                                └─ PostgresSaver → PostgreSQL checkpoint 表
+
+内部模拟凭据 / HTTP → apps/mockcorp/main.py :8001
+                       ├─ Bearer → 服务端 tenant
+                       ├─ Identity / Code / Ticket / Money（13 个写操作）
+                       └─ service → domain → store → PostgreSQL
+                           ├─ dry-run：校验、diff、rollback
+                           ├─ 正式执行：状态与收据同事务提交
+                           └─ 故障注入：默认关闭，显式开启
+
+Redis 7：容器与持久卷已就绪，尚未接入任务队列
 ```
 
-## 数据流：一次写动作为什么要过两道门
+主 API、断点演示和 MockCorp 是独立入口。主 API 当前不调用演示图或 MockCorp。
+MockCorp 模拟外部系统，凭据授予租户内模拟操作权限；不在内部重复调用 OPA。
+后续 Agent 工具网关仍需执行策略校验、审批和重试。
 
-1. **护栏层（W4）** 判断"这句话是不是恶意/越权"，越权在进入规划前拦掉。
-2. **策略层（W1 已实现）** 判断"这个角色能不能做这个动作"，唯一事实来源是 `policies/`。
-3. **执行层（W7）** 工具网关在真正调用前再校验一次 —— 不信任上游，因为上游是模型。
-
-W1 只实现了第 2 道门，并且在 API 层证明"拒绝会返回 403 + 可读原因"。
-执行器故意返回 501，而不是假装成功：宁可暴露缺口，也不要让 W7 之前的演示给人错觉。
-
-## 表结构（W1）
+## 数据表
 
 | 表 | 用途 | 关键字段 |
 |---|---|---|
-| `tenants` | 租户隔离的根 | `slug` |
-| `users` | 组织成员 + 角色 | `role`、`external_id`（AD/SSO） |
-| `requests` | 一次办事请求 | `thread_id`（对 LangGraph checkpoint）、`status`、`plan`(JSONB) |
-| `audit_log` | 审计流水 | `prev_hash`/`entry_hash`（链式哈希，唯一索引防分叉） |
+| `tenants` | W1 租户业务表 | `slug` |
+| `users` | W1 组织成员与角色 | `role`、`external_id` |
+| `requests` | W1 办事请求 | `thread_id`、`status`、`plan` |
+| `audit_log` | W1 审计链结构 | `prev_hash`、`entry_hash` |
+| PostgresSaver 自建表 | W1 演示图的持久化 checkpoint | thread_id 等 |
+| `mockcorp_state` | W2 模拟业务，与 W1 业务表隔离 | tenant 主键、state JSONB |
+| `mockcorp_receipts` | W2 幂等结果，与业务状态原子提交 | tenant+key 主键、fingerprint、status_code、response |
 
-## 状态机骨架（W1 验证的最小闭环）
+MockCorp 每租户一行模拟状态；行锁串行化同租户写入，跨租户可并发。
+dry-run、提交前拒绝和故障回滚整个事务；成功与部分成功收据跨进程持久化。
+这是模拟环境的实现，不承诺高吞吐或无限资源；详见
+[ADR-0003](design-decisions/0003-mockcorp-transactions.md) 和 [HTTP 契约](mockcorp-api.md)。
 
-```
+## 已验证的状态机骨架
+
+```text
 START → echo → approval(interrupt) → report → END
                     ▲
-                    └── 进程退出后，新进程按 thread_id 从 checkpoint 恢复
+                    └─ 进程退出后，新进程按 thread_id 从 checkpoint 恢复
 ```
 
-这条链是后面所有价值的前提：**没有跨进程恢复，"审批等 3 小时"就是假的。**
+已验证跨进程恢复，包括 checkpoint 提交后强杀进程。尚未连接真实工具或审批 UI。
 
-## 尚未实现（写在明处，别自我暗示已完成）
+## 尚未实现
 
-护栏、RAG、记忆、MCP 工具、MockCorp、幂等键、Saga 补偿、审批台、Trace 回放、评测 harness ——
-全部在 W2–W12。当前仓库只有骨架 + 策略门 + 断点恢复。
+W3 以后的护栏、RAG、记忆、MCP 工具网关、Agent 执行器与自动重试、Saga 补偿、审批台、
+Trace 回放和评测 harness。MockCorp 的供应方幂等与故障语义已完成；这些能力尚未接入 Agent 编排。

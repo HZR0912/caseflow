@@ -10,7 +10,9 @@
 
 ## 当前状态
 
-W1（骨架周）的本地验证及 GitHub Actions 三个 job 均已通过，线上结果见顶部 CI 徽章。
+W1（骨架周）已完成；W2 已实现 MockCorp 四个系统、13 个写操作，支持 dry-run、
+PostgreSQL 持久化幂等、故障注入。启动与验收见 [MockCorp API](docs/mockcorp-api.md)。
+线上验证结果见顶部 CI 徽章。
 
 | 验收项 | 状态 | 证据 |
 |---|---|---|
@@ -19,8 +21,14 @@ W1（骨架周）的本地验证及 GitHub Actions 三个 job 均已通过，线
 | 能演示"策略拒绝一次请求" | ✅ | intern 请求 `admin.grant` → 403 `self_escalation_forbidden` |
 | 跨进程断点恢复 | ✅ | `start` 在审批断点后正常退出，另一个进程 `resume` 完成；另已实测 checkpoint 持久化后强杀进程再恢复 |
 
-已知缺口：执行器返回 501，因为幂等键 / 重试 / 补偿在 W7–W8；护栏、RAG、记忆、MockCorp、
-MCP 工具、审批台、Trace 回放、评测 harness 全部未开始。
+W2 本地已通过 95 项非集成测试、6 项真实 PostgreSQL 集成测试；包含迁移往返、并发单次扣款、
+余额竞争、207 部分成功持久化、HTTP 超时后强杀服务并重启重放。
+Docker 实际启动、容器重启后幂等重放，以及文档中的 PowerShell/curl 命令均已验证。另提供
+`uv run python -m scripts.w2_mockcorp_demo` 做真实 HTTP 验收，需按文档配置凭据和开启故障。
+
+已知缺口：Agent 执行器仍返回 501，工具网关 / 自动重试 / 补偿在 W7–W8；
+护栏、RAG、记忆、MCP 工具、审批台、Trace 回放、评测 harness 尚未实现。
+MockCorp 的供应方幂等已实现，尚未接入 Agent 编排。
 
 ## 快速开始
 

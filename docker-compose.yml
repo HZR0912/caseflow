@@ -44,7 +44,7 @@ services:
       retries: 24
     logging: *default-logging
 
-  # 策略引擎：策略以 .rego 文件挂载，--watch 支持改完即生效（本地开发用）
+  # 策略引擎：策略以 .rego 文件挂载；Windows 下 --watch 可能收不到事件，修改后 restart opa。
   opa:
     image: openpolicyagent/opa:1.4.2
     container_name: caseflow-opa
@@ -88,6 +88,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-caseflow}:${POSTGRES_PASSWORD:-caseflow_dev_pw}@postgres:5432/${POSTGRES_DB:-caseflow}
       REDIS_URL: redis://redis:6379/0
       OPA_URL: http://opa:8181
+      AUTH_CREDENTIALS: ${AUTH_CREDENTIALS:-[]}
     ports:
       - "8000:8000"
     # 镜像里没有 curl，但一定有 python：用 urllib 打自己的 /healthz

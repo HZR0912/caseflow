@@ -16,8 +16,9 @@ from typing import Annotated
 
 from core.policy.opa_client import PolicyClient, PolicyQuery, PolicyResource, PolicySubject
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from apps.api.auth import SubjectDep
 from apps.api.settings import get_settings
 
 
@@ -49,16 +50,15 @@ PolicyDep = Annotated[PolicyClient, Depends(get_policy_client)]
 class ActionRequest(BaseModel):
     """一次写动作请求。W1 的字段刻意最小，W7 会扩成完整的 tool call 结构。"""
 
-    user_id: str = Field(description="发起人 ID")
-    role: str = Field(description="发起人角色，取自身份系统，不由客户端自报")
+    model_config = ConfigDict(extra="forbid")
+
     action: str = Field(description="命名空间动作，如 code.invite_member")
     resource_type: str = Field(description="资源类型，如 repo / account / order")
     resource_id: str | None = None
-    tenant: str = "default"
 
-    def to_query(self) -> PolicyQuery:
+    def to_query(self, subject: PolicySubject) -> PolicyQuery:
         return PolicyQuery(
-            subject=PolicySubject(id=self.user_id, role=self.role, tenant=self.tenant),
+            subject=subject,
             action=self.action,
             resource=PolicyResource(type=self.resource_type, id=self.resource_id),
         )
@@ -71,16 +71,16 @@ async def healthz() -> dict[str, str]:
 
 
 @app.post("/v1/policy/check", tags=["policy"])
-async def policy_check(req: ActionRequest, policy: PolicyDep) -> dict:
+async def policy_check(req: ActionRequest, policy: PolicyDep, subject: SubjectDep) -> dict:
     """只问策略，不执行 —— 调试和前端预览用。"""
-    decision = await policy.authorize(req.to_query())
+    decision = await policy.authorize(req.to_query(subject))
     return decision.model_dump()
 
 
 @app.post("/v1/actions/execute", tags=["actions"])
-async def execute_action(req: ActionRequest, policy: PolicyDep) -> dict:
+async def execute_action(req: ActionRequest, policy: PolicyDep, subject: SubjectDep) -> dict:
     """受策略门保护的写操作入口：先问 OPA，再谈执行。"""
-    decision = await policy.authorize(req.to_query())
+    decision = await policy.authorize(req.to_query(subject))
     if not decision.allow:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -1,0 +1,104 @@
+name: caseflow
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: caseflow-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-caseflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-caseflow_dev_pw}
+      POSTGRES_DB: ${POSTGRES_DB:-caseflow}
+      TZ: Asia/Shanghai
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-caseflow} -d ${POSTGRES_DB:-caseflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    container_name: caseflow-redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+    logging: *default-logging
+
+  # 策略引擎：策略以 .rego 文件挂载，--watch 支持改完即生效（本地开发用）
+  opa:
+    image: openpolicyagent/opa:1.4.2
+    container_name: caseflow-opa
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=info"
+      - "--watch"
+      - "/policies"
+    ports:
+      - "${OPA_PORT:-8181}:8181"
+    volumes:
+      - ./policies:/policies:ro
+    # OPA 官方镜像是 distroless（没有 sh / curl / wget），所以探活只能用 /opa 自身。
+    # 用 `opa eval` + http.send 打自己的 /health：这是唯一能在无 shell 镜像里做的
+    # 真实 HTTP 探活，而不是退化成"看一眼进程在不在"。
+    healthcheck:
+      test:
+        - "CMD"
+        - "/opa"
+        - "eval"
+        - "--format=raw"
+        - "--fail"
+        - 'http.send({"method":"get","url":"http://127.0.0.1:8181/health"}).status_code == 200'
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 5s
+    logging: *default-logging
+
+  # 主服务：默认不启动（构建镜像需要外网拉 uv 与依赖）。
+  # 想一条命令起全栈：docker compose --profile app up -d
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    container_name: caseflow-api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-caseflow}:${POSTGRES_PASSWORD:-caseflow_dev_pw}@postgres:5432/${POSTGRES_DB:-caseflow}
+      REDIS_URL: redis://redis:6379/0
+      OPA_URL: http://opa:8181
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opa:
+        condition: service_healthy
+    logging: *default-logging
+
+volumes:
+  pgdata:
+  redisdata:

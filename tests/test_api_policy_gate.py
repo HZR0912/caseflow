@@ -11,7 +11,7 @@ from apps.api.main import app
 from fastapi.testclient import TestClient
 
 OPA = "http://127.0.0.1:8181"
-PATH = "/v1/data/caseflow/authz"
+PATH = "/v1/data/caseflow/authz/decision"
 
 INTERN_GRANTS_ADMIN = {
     "user_id": "u_3",

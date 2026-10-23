@@ -4,7 +4,7 @@
 
 1. **fail-closed**：OPA 超时 / 5xx / 连不上 → 一律拒绝。策略引擎不可用时放行，
    等于把整个权限平面变成摆设。
-2. **决策可解释**：调用 `/v1/data/caseflow/authz` 拿 `{allow, reason}`，reason 进审计日志
+2. **决策可解释**：调用 `/v1/data/caseflow/authz/decision` 拿 `{allow, reason}`，reason 进审计日志
    和前端提示，而不是只返回一个 false。
 3. **不缓存决策**：角色可变、策略可热更新（OPA `--watch`），缓存会放大授权窗口。
 """
@@ -17,8 +17,9 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field
 
-# 策略包路径：policies/authz.rego -> package caseflow.authz
-DEFAULT_DECISION_PATH = "/v1/data/caseflow/authz"
+# 策略包路径：policies/authz.rego -> package caseflow.authz，对外契约是 decision 对象。
+# 只查 decision 而不是整个包：内部规则（角色映射表等）不进入调用方视野。
+DEFAULT_DECISION_PATH = "/v1/data/caseflow/authz/decision"
 
 
 class PolicySubject(BaseModel):

@@ -20,7 +20,7 @@ from core.policy.opa_client import (
 )
 
 OPA = "http://opa.test"
-PATH = "/v1/data/caseflow/authz"
+PATH = "/v1/data/caseflow/authz/decision"
 
 
 def make_query() -> PolicyQuery:

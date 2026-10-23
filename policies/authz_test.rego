@@ -34,3 +34,8 @@ test_missing_input_denied if {
 test_reason_is_reported if {
 	authz.reason == "role_not_permitted" with input as {"user": {"id": "u_3", "role": "intern"}, "action": "money.place_order", "resource": {"type": "order"}}
 }
+
+# 对外契约：客户端只读 decision，不允许直接依赖内部规则
+test_decision_contract if {
+	authz.decision == {"allow": false, "reason": "self_escalation_forbidden"} with input as {"user": {"id": "u_3", "role": "intern"}, "action": "admin.grant", "resource": {"type": "account"}}
+}

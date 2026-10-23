@@ -1,5 +1,7 @@
 # CaseFlow（事务官）
 
+[![CI](https://github.com/HZR0912/caseflow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HZR0912/caseflow/actions/workflows/ci.yml)
+
 面向企业跨系统办事场景的 Agent：**听懂需求 → 查制度 → 做计划 → 预演 → 等人审批 → 执行 → 失败回滚 → 留痕可审**。
 
 定位不是 RAG 问答机器人，而是 **Agent 的写操作平面**：读操作人人会做，写操作（可逆性、幂等、权限、审批、追溯、部分成功语义）才是工业界的门槛。
@@ -8,12 +10,12 @@
 
 ## 当前状态
 
-W1（骨架周）已完成，三条验收标准全部实测通过。
+W1（骨架周）的本地验证已通过，GitHub Actions 线上运行及绿色徽章待完成。
 
 | 验收项 | 状态 | 证据 |
 |---|---|---|
 | `docker compose up` 一条命令起服务 | ✅ | postgres / redis / opa / api 四个容器全部 `healthy` |
-| CI 绿（ruff + pytest + `opa test`） | ✅ | `.github/workflows/ci.yml`；本地 ruff 通过、13 tests passed、`opa test` 8/8 |
+| CI 绿（ruff + pytest + `opa test`） | 待线上验证 | `.github/workflows/ci.yml` 已配置；本地 ruff 通过、13 tests passed、`opa test` 8/8；尚无线上的成功运行记录 |
 | 能演示"策略拒绝一次请求" | ✅ | intern 请求 `admin.grant` → 403 `self_escalation_forbidden` |
 | （额外）跨进程断点恢复 | ✅ | `scripts/w1_checkpoint_demo.py start` 后杀进程，`resume` 从 checkpoint 跑完 |
 

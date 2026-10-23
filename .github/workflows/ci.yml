@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v9.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
@@ -66,7 +66,7 @@ jobs:
       DATABASE_URL: postgresql://caseflow:caseflow_dev_pw@127.0.0.1:5432/caseflow
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v9.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true

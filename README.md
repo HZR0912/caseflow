@@ -10,12 +10,12 @@
 
 ## 当前状态
 
-W1（骨架周）的本地验证已通过，GitHub Actions 线上运行及绿色徽章待完成。
+W1（骨架周）的本地验证及 GitHub Actions 三个 job 均已通过，线上结果见顶部 CI 徽章。
 
 | 验收项 | 状态 | 证据 |
 |---|---|---|
 | `docker compose up` 一条命令起服务 | ✅ | postgres / redis / opa / api 四个容器全部 `healthy` |
-| CI 绿（ruff + pytest + `opa test`） | 待线上验证 | `.github/workflows/ci.yml` 已配置；本地 ruff 通过、13 tests passed、`opa test` 8/8；尚无线上的成功运行记录 |
+| CI 绿（ruff + pytest + `opa test`） | ✅ | [GitHub Actions 首次成功运行](https://github.com/HZR0912/caseflow/actions/runs/39906307840)：lint-and-test、policy、integration 三个 job 全部通过，含迁移往返和断点恢复集成测试 |
 | 能演示"策略拒绝一次请求" | ✅ | intern 请求 `admin.grant` → 403 `self_escalation_forbidden` |
 | （额外）跨进程断点恢复 | ✅ | `scripts/w1_checkpoint_demo.py start` 后杀进程，`resume` 从 checkpoint 跑完 |
 

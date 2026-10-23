@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -15,8 +17,14 @@ from core.rag.chunking import load_corpus, parse_document
 from core.rag.citations import check_answer, verify_citation
 from core.rag.embedder import HashingEmbedder, cosine
 from core.rag.offline import OfflineIndex
-from core.rag.ranking import Candidate, resolve_versions, rrf_fuse, section_key_of
-from core.rag.tokenizer import normalize, to_tsquery_text, tokenize
+from core.rag.ranking import (
+    Candidate,
+    align_superseded,
+    resolve_versions,
+    rrf_fuse,
+    section_key_of,
+)
+from core.rag.tokenizer import normalize, to_or_tsquery, to_tsquery_text, tokenize
 
 POLICIES = Path(__file__).resolve().parents[1] / "data" / "policies"
 AS_OF = date(2026, 4, 1)
@@ -44,7 +52,27 @@ def test_chunks_are_clause_level_not_article_level(corpus):
     travel = [c for c in chunks if c.doc_key == "travel-expense"]
     # 两个版本 × 十余条；如果退回按章切，总数会掉到个位数
     assert len(travel) > 20
-    assert all(c.section_path.startswith("第") for c in travel)
+    assert all("条" in c.section_path.rsplit(" > ", 1)[-1] for c in travel)
+    assert all(c.section_path.count("章") <= 1 for c in travel)
+
+
+# 以下三条是外部审查发现的问题的回归测试。
+# 共同点：**slice == text 的自洽性测试抓不到它们**——两边是同一段错误文本。
+def test_chunk_never_contains_another_heading(corpus):
+    """回归：块的终点曾是「下一个 ###」，于是每章末条把下一章的 `## X 章` 吞进正文。"""
+    chunks, _ = corpus
+    offenders = [c.chunk_id for c in chunks if re.search(r"^#{1,6}\s", c.text, re.M)]
+    assert offenders == [], f"这些块里混入了标题：{offenders}"
+
+
+def test_section_path_includes_chapter(corpus):
+    """回归：标题栈只处理了 ###，section_path 里从来没有章这一层。"""
+    chunks, _ = corpus
+    assert all("章" in c.section_path for c in chunks), (
+        f"缺少章路径的块：{[c.chunk_id for c in chunks if '章' not in c.section_path][:5]}"
+    )
+    sample = next(c for c in chunks if c.chunk_id == "travel-expense@2026.1#005")
+    assert sample.section_path == "差旅费用管理办法 > 第三章 住宿标准 > 第 6 条 国内住宿标准"
 
 
 def test_document_requires_front_matter(tmp_path):
@@ -185,7 +213,70 @@ def test_resolve_survives_clause_renumbering():
 
 def test_resolve_excludes_future_versions():
     items = [_candidate("t@2027#001", "t", "2027.1", "第 1 条 目的", date(2027, 1, 1))]
-    assert resolve_versions(items, as_of=AS_OF).hits == []
+    ranked = resolve_versions(items, as_of=AS_OF)
+    assert ranked.hits == []
+    # 回归：未来版本曾被塞进 superseded，以"历史版本"的身份误导用户
+    assert ranked.superseded == []
+
+
+def test_resolve_never_returns_an_expired_document_as_current():
+    """回归：superseded_date 存了不查。
+
+    只召回到已废止的旧版（用户问的词只出现在旧版里）时，它不能作为现行规定返回；
+    应进 superseded，由上层决定如何提示"该口径已废止"。"""
+    items = [_candidate("t@2025#003", "t", "2025.2", "第 4 条 审批层级", date(2025, 3, 1))]
+    items[0].superseded_date = date(2025, 12, 31)
+    ranked = resolve_versions(items, as_of=AS_OF)
+    assert ranked.hits == []
+    assert [h.chunk_id for h in ranked.superseded] == ["t@2025#003"]
+
+
+def test_resolve_treats_superseded_date_on_the_boundary_as_today():
+    item = _candidate("t@2025#003", "t", "2025.2", "第 4 条 审批层级", date(2025, 3, 1))
+    item.superseded_date = AS_OF
+    assert [h.chunk_id for h in resolve_versions([item], as_of=AS_OF).hits] == ["t@2025#003"]
+
+
+def test_align_superseded_drops_unrelated_history():
+    """回归：top_k 只截 hits，superseded 曾保留全部召回候选里的淘汰项。"""
+    hits = [_candidate("t@2026#003", "t", "2026.1", "第 4 条 审批层级", date(2026, 1, 1))]
+    superseded = [
+        _candidate("t@2025#003", "t", "2025.2", "第 4 条 审批层级", date(2025, 3, 1)),
+        _candidate("t@2025#010", "t", "2025.2", "第 10 条 报销时限", date(2025, 3, 1)),
+    ]
+    kept = align_superseded(hits, superseded)
+    assert [item.chunk_id for item in kept] == ["t@2025#003"]
+
+
+def test_or_query_is_disjunctive_and_escaped():
+    """回归：plainto_tsquery 把 token 全部 AND，中文二元组必然 0 命中。"""
+    text = to_or_tsquery(["生产", "环境", "长多", "少天"])
+    assert text == "生产 | 环境 | 长多 | 少天"
+    # 操作符与空白必须被剥掉，否则 to_tsquery 语法错误
+    assert to_or_tsquery(["a&b", "c|d", "  "]) == "ab | cd"
+    assert to_or_tsquery(["", "  "]) == ""
+
+
+def test_every_eval_query_has_a_nonempty_or_query():
+    here = Path(__file__).resolve().parents[1]
+    payload = json.loads((here / "eval" / "rag_cases.json").read_text(encoding="utf-8"))
+    for case in payload["cases"]:
+        assert to_or_tsquery(tokenize(case["query"])), case["id"]
+
+
+def test_eval_queries_share_at_least_one_token_with_corpus(corpus):
+    """OR 语义下的最低保证：每条评测查询都能命中至少一个块。
+
+    这不能代替连库测试，但能在零依赖环境里守住"查询与语料完全脱节"这类灾难。"""
+    chunks, _ = corpus
+    vocabulary = set().union(
+        *(set(tokenize(f"{c.title} {c.section_path} {c.text}")) for c in chunks)
+    )
+    here = Path(__file__).resolve().parents[1]
+    payload = json.loads((here / "eval" / "rag_cases.json").read_text(encoding="utf-8"))
+    for case in payload["cases"]:
+        overlap = set(tokenize(case["query"])) & vocabulary
+        assert overlap, f"{case['id']} 与全部语料没有任何共同 token"
 
 
 def test_section_key_strips_clause_number():

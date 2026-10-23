@@ -20,7 +20,14 @@ from datetime import date
 from core.rag.bm25 import BM25
 from core.rag.chunking import Chunk
 from core.rag.embedder import Embedder, cosine
-from core.rag.ranking import Candidate, Ranked, resolve_versions, rrf_fuse, section_key_of
+from core.rag.ranking import (
+    Candidate,
+    Ranked,
+    align_superseded,
+    resolve_versions,
+    rrf_fuse,
+    section_key_of,
+)
 
 
 class OfflineIndex:
@@ -129,4 +136,5 @@ class OfflineIndex:
         )
         ranked.routes = {f"route{i}": len(route) for i, route in enumerate(routes)}
         ranked.hits = ranked.hits[:top_k]
+        ranked.superseded = align_superseded(ranked.hits, ranked.superseded)
         return ranked

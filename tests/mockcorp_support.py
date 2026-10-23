@@ -4,9 +4,14 @@ from copy import deepcopy
 from threading import Lock
 
 from apps.mockcorp.domain import initial_state
+from apps.mockcorp.store import LogEntry, Outcome, Reply
 
 
 class MemoryStore:
+    """单测替身。**outcome 一律由生产代码的 `Outcome.outcome_of()` 决定**——
+    替身自己手写一套分类（早期版本硬编码了 "error"）会让替身与生产实现漂移，
+    于是生产代码的 bug 在单测里被掩盖、只在真库集成测试里才炸。"""
+
     def __init__(self, settings):
         self.settings = settings
         self.states = {}
@@ -34,7 +39,12 @@ class MemoryStore:
             try:
                 outcome = handler(state, deepcopy(self.receipts.get((tenant, key))))
             except Exception:
-                self._log(tenant, key, operation, actor, {"status": 500}, "error", "internal_error")
+                # 与 PostgresStore 保持一致：走生产代码的 Outcome 分类，不手写字面量
+                failure = Outcome(
+                    reply=Reply(500, {}),
+                    log=LogEntry(operation=operation, actor=actor, error_code="internal_error"),
+                )
+                self._record(tenant, key, failure, operation, actor)
                 raise
             if outcome.persist:
                 self.states[tenant] = deepcopy(state)
@@ -43,20 +53,22 @@ class MemoryStore:
                     "status": outcome.reply.status,
                     "body": deepcopy(outcome.reply.body),
                 }
-            self._log(
-                tenant,
-                key,
-                operation,
-                actor,
-                outcome.reply,
-                outcome.outcome_of(),
-                outcome.log.error_code,
-                outcome.log.result_id,
-                outcome.fingerprint,
-                outcome.log.dry_run,
-                outcome.log.replayed,
-            )
+            self._record(tenant, key, outcome, operation, actor)
             return outcome.reply
+
+    def _record(self, tenant, key, outcome, operation, actor):
+        self._log(
+            tenant,
+            key,
+            outcome.log.operation or operation,
+            outcome.log.actor if outcome.log.actor is not None else actor,
+            outcome.reply.status,
+            outcome.outcome_of(),
+            outcome.log.error_code,
+            outcome.log.result_id,
+            outcome.log.dry_run,
+            outcome.log.replayed,
+        )
 
     def _log(
         self,
@@ -64,16 +76,14 @@ class MemoryStore:
         key,
         operation,
         actor,
-        reply,
+        status,
         outcome,
         error_code=None,
         result_id=None,
-        fingerprint=None,
         dry_run=False,
         replayed=False,
     ):
         rows = self.logs.setdefault(tenant, [])
-        status = reply.get("status") if isinstance(reply, dict) else reply.status
         rows.append(
             {
                 "id": len(rows) + 1,

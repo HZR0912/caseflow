@@ -43,3 +43,23 @@ def tokenize(text: str) -> list[str]:
 def to_tsquery_text(tokens: list[str]) -> str:
     """把 token 列表转成 `tsvector` 可读的形态（空格分隔，simple 配置不词干化）。"""
     return " ".join(dict.fromkeys(tokens))
+
+
+def to_or_tsquery(tokens: list[str]) -> str:
+    """把 token 转成 `to_tsquery('simple', ...)` 的 **OR** 表达式，如 `a | b | c`。
+
+    为什么不是 `plainto_tsquery`：它把传入的每个词用 `&`（AND）拼起来，
+    要求文档同时包含**全部** token。中文按二元组切分后，一个自然语言问句会切出
+    「长多」「少天」这类碎片，只要有一个碎片不在条款里，整条查询就命中 0 行。
+    实测 12 条评测查询在 `plainto_tsquery` 下**全部为 0**——线上全文路等于不存在，
+    系统退化成纯向量单路，而集成测试因为向量没清干净而"通过"（假阳性）。
+
+    OR 语义下 `ts_rank` 仍然按"命中多少个 token / 有多罕见"打分，所以排序质量不受损，
+    只是不再要求全词命中——这正是自然语言问句检索需要的。
+
+    token 必须做过转义：`to_tsquery` 的语法里 `& | ! ( ) : *` 都是操作符，
+    直接拼接用户输入会语法错误甚至被当成操作符注入。
+    """
+    safe = [re.sub(r"[^\w一-鿿]+", "", token) for token in tokens]
+    unique = list(dict.fromkeys(t for t in safe if t))
+    return " | ".join(unique)

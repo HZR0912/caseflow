@@ -33,8 +33,15 @@ import psycopg
 
 from core.rag.chunking import Chunk
 from core.rag.embedder import Embedder
-from core.rag.ranking import Candidate, Ranked, resolve_versions, rrf_fuse, section_key_of
-from core.rag.tokenizer import normalize, to_tsquery_text, tokenize
+from core.rag.ranking import (
+    Candidate,
+    Ranked,
+    align_superseded,
+    resolve_versions,
+    rrf_fuse,
+    section_key_of,
+)
+from core.rag.tokenizer import normalize, to_or_tsquery, to_tsquery_text, tokenize
 
 
 class PolicyStore:
@@ -58,7 +65,16 @@ class PolicyStore:
 
     # ------------------------------------------------------------------
     def ingest(self, chunks: list[Chunk], *, batch: int = 32, embed: bool = True) -> int:
-        """幂等写入（同 chunk_id 覆盖）。返回写入条数。"""
+        """幂等写入（同 chunk_id 覆盖）。返回写入条数。
+
+        ⚠ `embed=False` 会**把 embedding 置为 NULL**，而不是"保留原值"。
+        最初写的是 `COALESCE(EXCLUDED.embedding, 表.embedding)`，结果"清空向量"
+        这个动作根本没生效——集成测试以为自己在验证全文路，实际仍在走向量路，
+        于是全文路坏成 0 召回也没人发现（假阳性）。
+        正确语义：`ingest(embed=False)` = "只重建文本与索引，暂无向量"。
+        如果将来需要"增量补向量、不动其它字段"，那应该是另一个方法（`embed_missing`），
+        不要在一个参数里塞两种语义。
+        """
         vectors: list[list[float] | None] = [None] * len(chunks)
         if embed and chunks and self.embedder is not None:
             for start in range(0, len(chunks), batch):
@@ -79,7 +95,7 @@ class PolicyStore:
                         section_key = EXCLUDED.section_key,
                         text = EXCLUDED.text,
                         tokens = EXCLUDED.tokens,
-                        embedding = COALESCE(EXCLUDED.embedding, {self.table}.embedding),
+                        embedding = EXCLUDED.embedding,
                         effective_date = EXCLUDED.effective_date,
                         superseded_date = EXCLUDED.superseded_date
                     """,
@@ -126,13 +142,15 @@ class PolicyStore:
         tokens = tokenize(query)
         if not tokens:
             return []
-        query_text = to_tsquery_text(tokens)
+        query_text = to_or_tsquery(tokens)
+        if not query_text:
+            return []
         with self._connect() as conn:
             rows = conn.execute(
                 f"""
                 SELECT chunk_id FROM {self.table}
-                WHERE tsv @@ plainto_tsquery('simple', %s) AND effective_date <= %s
-                ORDER BY ts_rank(tsv, plainto_tsquery('simple', %s)) DESC
+                WHERE tsv @@ to_tsquery('simple', %s) AND effective_date <= %s
+                ORDER BY ts_rank(tsv, to_tsquery('simple', %s)) DESC
                 LIMIT %s
                 """,
                 (query_text, as_of, query_text, recall),
@@ -167,6 +185,7 @@ class PolicyStore:
         ranked = resolve_versions(candidates, as_of=as_of, include_superseded=include_superseded)
         ranked.routes = {f"route{i}": len(route) for i, route in enumerate(routes)}
         ranked.hits = ranked.hits[:top_k]
+        ranked.superseded = align_superseded(ranked.hits, ranked.superseded)
         return ranked
 
     # ------------------------------------------------------------------

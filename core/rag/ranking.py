@@ -87,23 +87,57 @@ def resolve_versions(
       导致后面的「报销时限」从第 10 条变成第 11 条。条款号会漂移，条款**标题**不会。
 
     所以 section_key 取的是去掉「第 N 条」前缀后的标题文本，见 `section_key_of()`。
+
+    ------------------------------------------------------------------
+    三类候选的处理必须分开，混在一起会出错
+    ------------------------------------------------------------------
+    · 已废止（superseded_date < as_of）：**不能**作为现行规定返回。用户问"差旅花
+      2000 元谁批"，如果只召回了 2025 版那一条（2000 元是它的门槛），把它当现行
+      规定答出来就是错的——应当进 superseded，并在回答里说明"该口径已于某日废止"。
+    · 未来生效（effective_date > as_of）：既不是现行也不是历史，直接丢弃。
+      否则它会以"历史版本"的身份出现在 superseded 里，反而制造误导。
+    · 现行：按 (doc_key, section_key) 取最新版本，其余进 superseded。
     """
     best: dict[tuple[str, str], Candidate] = {}
+    current_ids: set[str] = set()
+    displaced: list[Candidate] = []  # 同条款的旧版本（被新版本顶掉）
+    expired: list[Candidate] = []  # 在 as_of 当天已整体废止
     for item in candidates:
         if item.effective_date > as_of:
-            continue  # 未来才生效的版本不参与本次检索
+            continue  # 未来版本：不参与、也不进 superseded
+        if item.superseded_date is not None and item.superseded_date < as_of:
+            expired.append(item)
+            continue
         key = (item.doc_key, item.section_key)
         current = best.get(key)
-        if current is None or _newer(item, current):
+        if current is None:
             best[key] = item
+            current_ids.add(item.chunk_id)
+        elif _newer(item, current):
+            current_ids.discard(current.chunk_id)
+            displaced.append(current)
+            best[key] = item
+            current_ids.add(item.chunk_id)
+        else:
+            displaced.append(item)
 
-    kept = {item.chunk_id for item in best.values()}
-    current = [item for item in candidates if item.chunk_id in kept]
-    superseded = (
-        [item for item in candidates if item.chunk_id not in kept] if include_superseded else []
-    )
+    current = [item for item in candidates if item.chunk_id in current_ids]
     current.sort(key=lambda item: (-item.score, item.chunk_id))
+    superseded = [*displaced, *expired] if include_superseded else []
+    superseded.sort(key=lambda item: (-item.score, item.chunk_id))
     return Ranked(hits=current, superseded=superseded)
+
+
+def align_superseded(hits: list[Candidate], superseded: list[Candidate]) -> list[Candidate]:
+    """只保留"与被返回的现行条款属于同一条"的历史版本。
+
+    为什么必须做：superseded 来自 recall 阶段的全部候选（默认 30 条），
+    而 hits 只取 top_k。不做对齐的话，top_k=1 时可能带回十几条与 top1 毫无关系的
+    旧条款——前端展示「另见历史版本」时会列出一堆无关内容，模型也可能拿它们
+    去拼答案。历史版本的价值是"同一件事以前怎么规定的"，不是"这次检索淘汰了谁"。
+    """
+    keys = {(hit.doc_key, hit.section_key) for hit in hits}
+    return [item for item in superseded if (item.doc_key, item.section_key) in keys]
 
 
 def section_key_of(section_path: str) -> str:

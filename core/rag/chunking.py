@@ -90,6 +90,13 @@ def split_document(doc: PolicyDoc) -> list[Chunk]:
 
     返回的 char_start / char_end 是相对 `doc.body` 的偏移，
     `doc.body[start:end]` 必须与 `chunk.text` 逐字相等——这是引用校验的地基。
+
+    ⚠ 边界规则（踩过的坑）：块的终点必须是**下一个任意级别的标题**，而不是下一个
+    `###`。最初写成 `stop = 下一个 ### 的位置`，于是每章最后一条会把下一章的
+    `## 第 X 章` 标题吞进自己的正文（实测 15/40 块受影响）。这不仅是"多了两行"：
+    额外标题里的词会进入该块的检索指纹，导致跨章命中；引用高亮时也会把下一章标题
+    一起标上。原先"slice == text"的自洽性测试抓不到它——两边是同一段错误文本。
+    所以必须有 `test_chunk_never_contains_another_heading` 这类**语义**断言。
     """
     headings = [
         (m.start(), m.end(), len(m.group(1)), m.group(2).strip())
@@ -105,14 +112,23 @@ def split_document(doc: PolicyDoc) -> list[Chunk]:
     if not cuts:
         return [_chunk(doc, 0, "整篇", "整篇", 0, len(doc.body))]
 
+    starts = [h[0] for h in headings]
     chunks: list[Chunk] = []
-    trail: list[tuple[int, str]] = []
-    for index, (_pos, end, level, title) in enumerate(cuts):
-        stop = cuts[index + 1][0] if index + 1 < len(cuts) else len(doc.body)
-        # 维护标题栈：同层或更深的旧标题全部出栈，再压入当前标题
-        trail = [(lv, t) for lv, t in trail if lv < level] + [(level, title)]
-        path = " > ".join(t for _, t in trail)
-        chunks.append(_chunk(doc, index, title, path, end, stop))
+    for index, (pos, end, level, title) in enumerate(cuts):
+        # 终点：下一个任意级别的标题；没有则到文末
+        following = next((s for s in starts if s > pos), len(doc.body))
+        # 路径：pos 之前、级别由浅到深**严格递减**的最近祖先链。
+        # 不能简单地取"所有级别更浅的标题"——那样同级的「第一章」「第二章」「第三章」
+        # 会全部串进路径里（实测出现「第一章 总则 > 第二章 审批 > 第三章 住宿标准 > 第 6 条」）。
+        ancestors: list[tuple[int, str]] = []
+        for h_pos, _h_end, h_level, h_title in reversed(headings):
+            if h_pos >= pos:
+                continue
+            if h_level < level and all(h_level < kept for kept, _ in ancestors):
+                ancestors.append((h_level, h_title))
+        ancestors.reverse()
+        path = " > ".join([t for _, t in ancestors] + [title])
+        chunks.append(_chunk(doc, index, title, path, end, following))
     return chunks
 
 

@@ -69,6 +69,27 @@
       "id": "home-owner",
       "query": "差旅管理办法是哪个部门发布的",
       "expect": ["travel-expense@2026.1#013"]
+    },
+    {
+      "id": "pc-seat-limit",
+      "query": "设计工具席位一个团队最多几个",
+      "expect": ["procurement-seat@2026.1#005"],
+      "note": "与 MockCorp Money 系统的 code_seat_limit 对应，W5 编排要用"
+    },
+    {
+      "id": "pc-idle-seat",
+      "query": "闲置的席位要多久退回",
+      "expect": ["procurement-seat@2026.1#006"]
+    },
+    {
+      "id": "pc-refund",
+      "query": "买错了工具已经开通了还能退多少钱",
+      "expect": ["procurement-seat@2026.1#009"]
+    },
+    {
+      "id": "pc-no-split",
+      "query": "账户余额不够能不能拆成几单下",
+      "expect": ["procurement-seat@2026.1#010"]
     }
   ]
 }

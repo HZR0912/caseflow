@@ -113,7 +113,12 @@ def test_dry_run_and_exception_rollback_leave_no_rows(postgres_context):
             "FROM mockcorp_oplog WHERE tenant=%s ORDER BY id",
             (tenant,),
         ).fetchall()
-    assert failures == [("identity.explode", "error", 500, "internal_error", "tester")]
+    # 两条：dry_run 那次预演 + 抛异常那次。原先只断言一条，是因为把"预演不留痕"
+    # 和"失败留痕"混为一谈——ADR-0004 明确写了预演要留日志。
+    assert failures == [
+        ("identity.create_user", "dry_run", 200, None, None),
+        ("identity.explode", "error", 500, "internal_error", "tester"),
+    ]
 
 
 def test_oplog_persists_across_connections_and_replays(postgres_context):
@@ -121,7 +126,7 @@ def test_oplog_persists_across_connections_and_replays(postgres_context):
     body = {"item": "editor", "quantity": 1, "unit_price_cents": 100}
     first = service.execute(tenant, "money.create_order", body, key="log", actor="alice")
     assert first.status == 201
-    replay = MockCorp(PostgresStore(store.url, store.settings)).execute(
+    replay = MockCorp(PostgresStore(store.url, store.settings), store.settings).execute(
         tenant, "money.create_order", body, key="log", actor="alice"
     )
     assert replay.headers["Idempotency-Replayed"] == "true"

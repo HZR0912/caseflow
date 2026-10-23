@@ -28,12 +28,18 @@ pgvector 向量 + Postgres 全文两路召回、RRF 融合、**跨版本冲突�
 | W2：13 个写操作 × 预演/执行/重放/瞬态失败 | ✅ | `pytest -m "not integration"`，参数化覆盖每个操作 |
 | W2：并发与强杀重启 | ✅ | 并发同 key 单次扣款、防透支、HTTP 超时后重启重放 |
 | W2：供给方操作日志 | ✅ | `GET /v1/oplog`，含 dry-run / rejected / replayed 四态 |
-| W3：检索 recall@5 = 1.000（12 用例） | ✅ | `python -m eval.run_rag_eval`，零外部依赖 |
+| W3：检索 recall@5 = 1.000（16 用例） | ✅ | `python -m eval.run_rag_eval`，零外部依赖 |
 | W3：版本冲突解析 4/4 | ✅ | 新旧版本并存时只答现行版本，旧版进 `superseded` |
 | W3：引用可验证 | ✅ | 真引文返回原文偏移；编造数字与过短片段被拒 |
 
-当前测试规模：**136 项非集成 + 13 项集成**（MockCorp 7 + RAG 6），
-`opa test` 11 项，检索评测 12 用例。
+当前测试规模：**144 项非集成 + 15 项集成**（MockCorp 7 + RAG 8），
+`opa test` 11 项，检索评测 16 用例。
+
+> ⚠ **集成测试本地未验证**：本仓库的集成测试（`pytest -m integration`）需要一个真实
+> Postgres。W2 交付时曾出现"README 写 13 项通过、实际 2 项失败"的情况——原因是
+> 修改只跑了离线测试就更新了文档。现在**凡是改动涉及 SQL 的提交，必须在
+> `DATABASE_URL` 指向真库的环境下跑一遍集成测试再更新这里的数字**；
+> 没跑过就写"待 CI 验证"。CI 的 integration job 每次都会跑。
 
 已知缺口：Agent 执行器仍返回 501，工具网关 / 自动重试 / 补偿在 W7–W8；
 护栏、记忆、MCP 工具、审批台、Trace 回放、评测 harness、LLM 生成与 rerank 尚未实现。

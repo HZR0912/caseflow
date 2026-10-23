@@ -49,6 +49,11 @@ class Outcome:
     log: LogEntry = field(default_factory=LogEntry)
 
     def outcome_of(self) -> str:
+        # 未预期异常走 error；其余按状态码分。这个分支必须显式写出来：
+        # 最初只有三个返回值，处理器抛异常时落库的是 rejected，而单测替身
+        # MemoryStore 手写硬编码了 "error"，两者不一致导致生产代码的 bug 被掩盖。
+        if self.reply.status >= 500 and self.log.error_code in (None, "internal_error"):
+            return "error"
         if self.log.replayed:
             return "committed" if self.persist or self.reply.status < 400 else "rejected"
         if 200 <= self.reply.status < 300:

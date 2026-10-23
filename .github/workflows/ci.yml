@@ -33,7 +33,24 @@ jobs:
       - name: 单元测试（不含 integration）
         run: uv run pytest -m "not integration" -q
 
-  # 2) 策略单测：opa test 是策略层的 pytest 等价物。
+  # 2) 检索评测：零外部依赖（本地 BM25 + 哈希向量）。改了切块/分词/融合/版本解析
+  #    之后，这一步会立刻告诉你检索质量有没有退化。
+  retrieval-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: 安装依赖
+        run: uv sync --frozen --extra dev
+      - name: 知识库检索评测（recall@5 / MRR / 版本冲突）
+        run: uv run python -m eval.run_rag_eval --json eval/rag_eval_offline.json
+      - name: W3 演示脚本自检
+        run: uv run python -m scripts.w3_rag_demo --check
+
+  # 3) 策略单测：opa test 是策略层的 pytest 等价物。
   policy:
     runs-on: ubuntu-latest
     steps:
@@ -46,7 +63,7 @@ jobs:
       - name: Rego 单测
         run: opa test policies -v
 
-  # 3) 真 postgres：迁移往返、checkpoint 恢复、MockCorp 并发事务及 HTTP 超时重启。
+  # 4) 真 postgres：迁移往返、checkpoint 恢复、MockCorp 并发事务及 HTTP 超时重启。
   integration:
     runs-on: ubuntu-latest
     services:

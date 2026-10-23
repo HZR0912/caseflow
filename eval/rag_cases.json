@@ -1,0 +1,74 @@
+{
+  "description": "W3 检索评测集。expect 是必须出现在 top_k 里的 chunk_id；superseded_expect 用于版本冲突用例：期望当前有效版本被返回、旧版本被归入 superseded。",
+  "as_of": "2026-04-01",
+  "cases": [
+    {
+      "id": "ac-intern-duration",
+      "query": "实习生的账号最长多久失效",
+      "expect": ["access-control@2026.1#003"]
+    },
+    {
+      "id": "ac-prod-permission",
+      "query": "生产环境权限最长多少天，到期怎么办",
+      "expect": ["access-control@2026.1#006"],
+      "note": "同时含数字与专有名词，考察全文路"
+    },
+    {
+      "id": "ac-batch",
+      "query": "一次性给 5 个人开权限需要谁批",
+      "expect": ["access-control@2026.1#007"],
+      "note": "查询里没有『批量授权』这个词，考察语义路"
+    },
+    {
+      "id": "ac-offboarding",
+      "query": "员工离职当天账号要处理吗",
+      "expect": ["access-control@2026.1#008"]
+    },
+    {
+      "id": "ac-review",
+      "query": "权限多久复核一次",
+      "expect": ["access-control@2026.1#010"]
+    },
+    {
+      "id": "te-hotel-current",
+      "query": "去上海出差住宿一晚最多能报多少",
+      "expect": ["travel-expense@2026.1#005"],
+      "superseded_expect": ["travel-expense@2025.2#005"],
+      "note": "版本冲突：2026 版 600 元、2025 版 500 元，必须答新版本并保留旧版本"
+    },
+    {
+      "id": "te-lodging-other-city",
+      "query": "去合肥出差住宿标准是多少",
+      "expect": ["travel-expense@2026.1#005"]
+    },
+    {
+      "id": "te-approval-tier",
+      "query": "出差预算比较大时需要部门负责人还是分管副总审批",
+      "expect": ["travel-expense@2026.1#003"],
+      "superseded_expect": ["travel-expense@2025.2#003"],
+      "note": "版本冲突：审批门槛 3000 元 vs 2000 元。原查询『8000 元要谁批』是数字推理题——语料里没有 8000 这个字面值，检索层只能命中相关度较弱的『出差申请』。这类查询归 LLM 做区间判断，不该进检索评测集。"
+    },
+    {
+      "id": "te-meal-allowance",
+      "query": "国内出差吃饭补贴一天多少钱",
+      "expect": ["travel-expense@2026.1#008"],
+      "superseded_expect": ["travel-expense@2025.2#008"]
+    },
+    {
+      "id": "te-reimburse-deadline",
+      "query": "出差回来多久之内要报销",
+      "expect": ["travel-expense@2026.1#010"],
+      "superseded_expect": ["travel-expense@2025.2#009"]
+    },
+    {
+      "id": "te-emergency",
+      "query": "线上出事来不及提前申请出差怎么办",
+      "expect": ["travel-expense@2026.1#004"]
+    },
+    {
+      "id": "home-owner",
+      "query": "差旅管理办法是哪个部门发布的",
+      "expect": ["travel-expense@2026.1#013"]
+    }
+  ]
+}

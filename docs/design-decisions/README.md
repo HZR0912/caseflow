@@ -8,6 +8,7 @@
 | [0002](0002-trusted-api-identity.md) | 用服务端 token 映射建立最小可信身份来源 | 已接受 |
 | [0003](0003-mockcorp-transactions.md) | MockCorp 原子幂等、预演和故障语义 | 已接受 |
 | [0004](0004-mockcorp-oplog.md) | MockCorp 独立操作日志，失败路径也写 | 已接受 |
+| [0005](0005-policy-rag.md) | 制度知识库：按条款切块、版本是块的属性、引用必须可验证 | 已接受 |
 
 ## 写 ADR 的规矩
 

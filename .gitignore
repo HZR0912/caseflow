@@ -19,7 +19,10 @@ htmlcov/
 # 运行时产物
 *.log
 tmp/
-data/
+data/*
+# 例外：制度语料是知识库的源文件，必须入库。
+# 注意 `data/` 会排除整个目录，git 不会进去找例外；必须排除 `data/*` 再放行子目录。
+!data/policies/
 *.sqlite3
 .pgdata/
 

@@ -10,24 +10,34 @@
 
 ## 当前状态
 
-W1（骨架周）已完成；W2 已实现 MockCorp 四个系统、13 个写操作，支持 dry-run、
-PostgreSQL 持久化幂等、故障注入。启动与验收见 [MockCorp API](docs/mockcorp-api.md)。
-线上验证结果见顶部 CI 徽章。
+**W1（骨架周）已完成；W2（MockCorp）已完成；W3（制度知识库）已完成。**
+
+W2 实现 MockCorp 四个系统、13 个写操作，支持 dry-run、PostgreSQL 持久化幂等、
+故障注入与供给方独立操作日志（ADR-0004）。启动与验收见 [MockCorp API](docs/mockcorp-api.md)。
+
+W3 实现制度知识库：按条款切块（`char_start/char_end` 可逐字回原文）、
+pgvector 向量 + Postgres 全文两路召回、RRF 融合、**跨版本冲突解析**、
+引用程序化校验。设计取舍见 [ADR-0005](docs/design-decisions/0005-policy-rag.md)。
 
 | 验收项 | 状态 | 证据 |
 |---|---|---|
-| `docker compose --profile app up -d --build` 启动四个服务 | ✅ | postgres / redis / opa / api 四个容器全部 `healthy`；不带 profile 时仅启动前三个服务 |
-| CI 绿（ruff + pytest + `opa test`） | ✅ | [GitHub Actions 首次成功运行](https://github.com/HZR0912/caseflow/actions/runs/39906307840)：lint-and-test、policy、integration 三个 job 全部通过，含迁移往返和断点恢复集成测试 |
-| 能演示"策略拒绝一次请求" | ✅ | intern 请求 `admin.grant` → 403 `self_escalation_forbidden` |
-| 跨进程断点恢复 | ✅ | `start` 在审批断点后正常退出，另一个进程 `resume` 完成；另已实测 checkpoint 持久化后强杀进程再恢复 |
+| W1：compose 四服务 healthy | ✅ | 不带 profile 时仅启动 postgres / redis / opa |
+| W1：CI 绿（ruff + pytest + `opa test` + 迁移往返） | ✅ | 现为四个 job，新增 `retrieval-eval` |
+| W1：策略拒绝一次请求 | ✅ | intern 请求 `admin.grant` → 403 `self_escalation_forbidden` |
+| W1：跨进程断点恢复 | ✅ | `scripts.w1_checkpoint_demo start` / `resume` 双进程验证 |
+| W2：13 个写操作 × 预演/执行/重放/瞬态失败 | ✅ | `pytest -m "not integration"`，参数化覆盖每个操作 |
+| W2：并发与强杀重启 | ✅ | 并发同 key 单次扣款、防透支、HTTP 超时后重启重放 |
+| W2：供给方操作日志 | ✅ | `GET /v1/oplog`，含 dry-run / rejected / replayed 四态 |
+| W3：检索 recall@5 = 1.000（12 用例） | ✅ | `python -m eval.run_rag_eval`，零外部依赖 |
+| W3：版本冲突解析 4/4 | ✅ | 新旧版本并存时只答现行版本，旧版进 `superseded` |
+| W3：引用可验证 | ✅ | 真引文返回原文偏移；编造数字与过短片段被拒 |
 
-W2 本地已通过 95 项非集成测试、6 项真实 PostgreSQL 集成测试；包含迁移往返、并发单次扣款、
-余额竞争、207 部分成功持久化、HTTP 超时后强杀服务并重启重放。
-Docker 实际启动、容器重启后幂等重放，以及文档中的 PowerShell/curl 命令均已验证。另提供
-`uv run python -m scripts.w2_mockcorp_demo` 做真实 HTTP 验收，需按文档配置凭据和开启故障。
+当前测试规模：**136 项非集成 + 13 项集成**（MockCorp 7 + RAG 6），
+`opa test` 11 项，检索评测 12 用例。
 
 已知缺口：Agent 执行器仍返回 501，工具网关 / 自动重试 / 补偿在 W7–W8；
-护栏、RAG、记忆、MCP 工具、审批台、Trace 回放、评测 harness 尚未实现。
+护栏、记忆、MCP 工具、审批台、Trace 回放、评测 harness、LLM 生成与 rerank 尚未实现。
+RAG 目前只有"检索"，还没有"生成答案"——生成与引用标注在 W5 接入编排时一起做。
 MockCorp 的供应方幂等已实现，尚未接入 Agent 编排。
 
 ## 快速开始

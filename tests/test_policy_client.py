@@ -127,3 +127,40 @@ async def test_opa_auth_errors_fail_closed(status_code: int) -> None:
 
     assert decision.allow is False
     assert decision.degraded is True
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"not json",
+        b"",
+        b"[]",
+        b"null",
+        b'{"result": null}',
+        b'{"result": []}',
+        b'{"result": "allowed"}',
+        b'{"result": {}}',
+        b'{"result": {"allow": "false", "reason": "bad"}}',
+        b'{"result": {"allow": "true", "reason": "bad"}}',
+        b'{"result": {"allow": 1, "reason": "bad"}}',
+        b'{"result": {"allow": 0, "reason": "bad"}}',
+        b'{"result": {"allow": null, "reason": "bad"}}',
+        b'{"result": {"reason": "bad"}}',
+        b'{"result": {"allow": true}}',
+        b'{"result": {"allow": true, "reason": 42}}',
+        b'{"result": {"allow": true, "reason": ""}}',
+        b'{"result": {"allow": true, "reason": "ok", "unexpected": true}}',
+    ],
+)
+@respx.mock
+async def test_malformed_response_fails_closed(body: bytes) -> None:
+    respx.post(f"{OPA}{PATH}").mock(return_value=httpx.Response(200, content=body))
+    client = PolicyClient(OPA)
+    try:
+        decision = await client.authorize(make_query())
+    finally:
+        await client.aclose()
+
+    assert decision.allow is False
+    assert decision.degraded is True
+    assert decision.reason == "policy_engine_invalid_response"

@@ -8,13 +8,17 @@
 
 ## 当前状态
 
-W1（骨架周）：仓库 / Docker Compose / Alembic / 最小 LangGraph 断点恢复 / 最小 OPA 策略 / CI。
+W1（骨架周）已完成，三条验收标准全部实测通过。
 
-| 目标 | 状态 |
-|---|---|
-| `docker compose up` 一条命令起 postgres + redis + opa | 进行中 |
-| CI 绿（ruff + pytest + `opa test`） | 进行中 |
-| 能演示"策略拒绝一次请求" | 进行中 |
+| 验收项 | 状态 | 证据 |
+|---|---|---|
+| `docker compose up` 一条命令起服务 | ✅ | postgres / redis / opa / api 四个容器全部 `healthy` |
+| CI 绿（ruff + pytest + `opa test`） | ✅ | `.github/workflows/ci.yml`；本地 ruff 通过、13 tests passed、`opa test` 8/8 |
+| 能演示"策略拒绝一次请求" | ✅ | intern 请求 `admin.grant` → 403 `self_escalation_forbidden` |
+| （额外）跨进程断点恢复 | ✅ | `scripts/w1_checkpoint_demo.py start` 后杀进程，`resume` 从 checkpoint 跑完 |
+
+已知缺口：执行器返回 501，因为幂等键 / 重试 / 补偿在 W7–W8；护栏、RAG、记忆、MockCorp、
+MCP 工具、审批台、Trace 回放、评测 harness 全部未开始。
 
 ## 快速开始
 
@@ -24,6 +28,12 @@ docker compose up -d              # postgres:5432 / redis:6379 / opa:8181
 uv sync --extra dev               # 安装依赖（含 dev 组）
 uv run alembic upgrade head       # 建表
 uv run uvicorn apps.api.main:app --reload --port 8000
+```
+
+也可以整栈跑（含 API 容器）：
+
+```bash
+docker compose --profile app up -d --build
 ```
 
 验证：
@@ -41,6 +51,8 @@ curl -X POST http://127.0.0.1:8000/v1/policy/check \
 ```bash
 uv run python -m scripts.w1_checkpoint_demo start    # 触发审批中断后退出进程
 uv run python -m scripts.w1_checkpoint_demo resume   # 新进程从 checkpoint 恢复并完成
+uv run python -m scripts.w1_checkpoint_demo status   # 查 checkpoint 状态
+uv run python -m scripts.w1_checkpoint_demo reset    # 清掉本 thread 的 checkpoint，方便重演
 ```
 
 ## 目录

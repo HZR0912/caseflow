@@ -1,7 +1,7 @@
 package caseflow.authz_test
 
-import rego.v1
 import data.caseflow.authz
+import rego.v1
 
 # opa test policies/ -v    ← CI 里跑这一条
 # 策略先写单测再接服务，这是 ADR-0001 里承诺的做法。

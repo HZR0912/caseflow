@@ -90,6 +90,17 @@ services:
       OPA_URL: http://opa:8181
     ports:
       - "8000:8000"
+    # 镜像里没有 curl，但一定有 python：用 urllib 打自己的 /healthz
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
     depends_on:
       postgres:
         condition: service_healthy

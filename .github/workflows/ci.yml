@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  OPA_VERSION: "1.4.2"
+
+jobs:
+  # 1) 零外部依赖：lint + 单测。任何 PR 都必须先过这一关。
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: 安装依赖
+        run: uv sync --frozen --extra dev
+      - name: Ruff 格式检查
+        run: uv run ruff format --check .
+      - name: Ruff 静态检查
+        run: uv run ruff check .
+      - name: 单元测试（不含 integration）
+        run: uv run pytest -m "not integration" -q
+
+  # 2) 策略单测：opa test 是策略层的 pytest 等价物。
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: ${{ env.OPA_VERSION }}
+      - name: Rego 格式检查
+        run: opa fmt --diff policies
+      - name: Rego 单测
+        run: opa test policies -v
+
+  # 3) 集成测试：真 postgres，验证迁移可 upgrade/downgrade、checkpoint 跨连接恢复。
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: caseflow
+          POSTGRES_PASSWORD: caseflow_dev_pw
+          POSTGRES_DB: caseflow
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U caseflow -d caseflow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://caseflow:caseflow_dev_pw@127.0.0.1:5432/caseflow
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: 安装依赖
+        run: uv sync --frozen --extra dev
+      - name: 迁移 upgrade head
+        run: uv run alembic upgrade head
+      - name: 迁移可回滚（downgrade -> upgrade）
+        run: |
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+      - name: 集成测试
+        run: uv run pytest -m integration -q

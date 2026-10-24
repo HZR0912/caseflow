@@ -50,7 +50,26 @@ jobs:
       - name: W3 演示脚本自检
         run: uv run python -m scripts.w3_rag_demo --check
 
-  # 3) 策略单测：opa test 是策略层的 pytest 等价物。
+  # 3) 护栏评测：零外部依赖（纯规则）。拦截率或误拦率变差即红灯——
+  #    这一关防的是"改一条正则把已经能拦的攻击放过去"。
+  guardrails-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: 安装依赖
+        run: uv sync --frozen --extra dev
+      - name: 护栏评测（拦截率 ≥95%，误拦 <5%）
+        run: uv run python -m eval.run_guardrails_eval --json eval/guardrails_eval.json
+      - name: 留出集报告（不设门禁，只记录泛化能力）
+        run: uv run python -m eval.run_guardrails_eval --cases data/guardrails/cases_holdout.yaml
+      - name: W4 演示脚本自检
+        run: uv run python -m scripts.w4_guardrails_demo --check
+
+  # 4) 策略单测：opa test 是策略层的 pytest 等价物。
   policy:
     runs-on: ubuntu-latest
     steps:
@@ -63,7 +82,7 @@ jobs:
       - name: Rego 单测
         run: opa test policies -v
 
-  # 4) 真 postgres：迁移往返、checkpoint 恢复、MockCorp 并发事务及 HTTP 超时重启。
+  # 5) 真 postgres：迁移往返、checkpoint 恢复、MockCorp 并发事务及 HTTP 超时重启。
   integration:
     runs-on: ubuntu-latest
     services:

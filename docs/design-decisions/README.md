@@ -9,6 +9,7 @@
 | [0003](0003-mockcorp-transactions.md) | MockCorp 原子幂等、预演和故障语义 | 已接受 |
 | [0004](0004-mockcorp-oplog.md) | MockCorp 独立操作日志，失败路径也写 | 已接受 |
 | [0005](0005-policy-rag.md) | 制度知识库：按条款切块、版本是块的属性、引用必须可验证 | 已接受 |
+| [0006](0006-input-guardrails.md) | 输入护栏：规则先行、归一化只用于匹配、越权只打标签不拦 | 已接受 |
 
 ## 写 ADR 的规矩
 

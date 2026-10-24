@@ -10,7 +10,7 @@
 
 ## 当前状态
 
-**W1（骨架周）已完成；W2（MockCorp）已完成；W3（制度知识库）已完成。**
+**W1（骨架周）已完成；W2（MockCorp）已完成；W3（制度知识库）已完成；W4（输入护栏）已完成。**
 
 W2 实现 MockCorp 四个系统、13 个写操作，支持 dry-run、PostgreSQL 持久化幂等、
 故障注入与供给方独立操作日志（ADR-0004）。启动与验收见 [MockCorp API](docs/mockcorp-api.md)。
@@ -19,10 +19,16 @@ W3 实现制度知识库：按条款切块（`char_start/char_end` 可逐字回�
 pgvector 向量 + Postgres 全文两路召回、RRF 融合、**跨版本冲突解析**、
 引用程序化校验。设计取舍见 [ADR-0005](docs/design-decisions/0005-policy-rag.md)。
 
+W4 实现输入护栏：归一化抗变形（零宽 / 空格插入 / 全角 / base64 展开）→
+注入与参数注入检测（逐条给出规则、权重与原文偏移）→ PII 可逆 token 化
+（原文进请求级 vault，不落盘）→ 意图置信度路由（route / clarify / human）→
+槽位抽取与缺槽追问。越权与数据外泄**只打风险标签交 OPA**，护栏不做授权判断。
+设计取舍见 [ADR-0006](docs/design-decisions/0006-input-guardrails.md)。
+
 | 验收项 | 状态 | 证据 |
 |---|---|---|
 | W1：compose 四服务 healthy | ✅ | 不带 profile 时仅启动 postgres / redis / opa |
-| W1：CI 绿（ruff + pytest + `opa test` + 迁移往返） | ✅ | 现为四个 job，新增 `retrieval-eval` |
+| W1：CI 绿（ruff + pytest + `opa test` + 迁移往返） | ✅ | 现为五个 job，含 `guardrails-eval` |
 | W1：策略拒绝一次请求 | ✅ | intern 请求 `admin.grant` → 403 `self_escalation_forbidden` |
 | W1：跨进程断点恢复 | ✅ | `scripts.w1_checkpoint_demo start` / `resume` 双进程验证 |
 | W2：13 个写操作 × 预演/执行/重放/瞬态失败 | ✅ | `pytest -m "not integration"`，参数化覆盖每个操作 |
@@ -31,9 +37,12 @@ pgvector 向量 + Postgres 全文两路召回、RRF 融合、**跨版本冲突�
 | W3：检索 recall@5 = 1.000（16 用例） | ✅ | `python -m eval.run_rag_eval`，零外部依赖 |
 | W3：版本冲突解析 4/4 | ✅ | 新旧版本并存时只答现行版本，旧版进 `superseded` |
 | W3：引用可验证 | ✅ | 真引文返回原文偏移；编造数字与过短片段被拒 |
+| W4：危险操作拦截率 1.000（60 条对抗集） | ✅ | `python -m eval.run_guardrails_eval`，CI 门禁 ≥ 95% |
+| W4：误拦率 0.000（30 条正常集） | ✅ | 同上，门禁 < 5% |
+| W4：留出集泛化 | ✅ | 首次 0.385 → 补规则后 1.000，数字与流程记在 ADR-0006 |
 
-当前测试规模：**144 项非集成 + 14 项集成**（MockCorp 7 + RAG 7），
-`opa test` 11 项，检索评测 16 用例。
+当前测试规模：**215 项非集成 + 14 项集成**（MockCorp 7 + RAG 7），
+`opa test` 11 项，检索评测 16 用例，护栏评测 60 + 30 用例（另有留出集 25 + 10）。
 
 > ⚠ **集成测试本地未验证**：本仓库的集成测试（`pytest -m integration`）需要一个真实
 > Postgres。W2 交付时曾出现"README 写 13 项通过、实际 2 项失败"的情况——原因是
@@ -42,8 +51,10 @@ pgvector 向量 + Postgres 全文两路召回、RRF 融合、**跨版本冲突�
 > 没跑过就写"待 CI 验证"。CI 的 integration job 每次都会跑。
 
 已知缺口：Agent 执行器仍返回 501，工具网关 / 自动重试 / 补偿在 W7–W8；
-护栏、记忆、MCP 工具、审批台、Trace 回放、评测 harness、LLM 生成与 rerank 尚未实现。
+记忆、MCP 工具、审批台、Trace 回放、评测 harness、LLM 生成与 rerank 尚未实现。
 RAG 目前只有"检索"，还没有"生成答案"——生成与引用标注在 W5 接入编排时一起做。
+护栏是规则实现（语义级改写会漏），LLM 分类器作为降级链的替换实现留到 W5；
+检索结果里的**间接注入**尚未覆盖，W5 接 RAG 时需要独立的扫描路径。
 MockCorp 的供应方幂等已实现，尚未接入 Agent 编排。
 
 ## 快速开始
@@ -111,6 +122,24 @@ uv run python -m scripts.w1_checkpoint_demo resume   # 新进程从 checkpoint �
 uv run python -m scripts.w1_checkpoint_demo status   # 查 checkpoint 状态
 uv run python -m scripts.w1_checkpoint_demo reset    # 清掉本 thread 的 checkpoint，方便重演
 ```
+
+输入护栏（W4 验收项之一，**不需要 Docker、数据库或 API key**）：
+
+```bash
+uv run python -m scripts.w4_guardrails_demo          # 八个场景逐层打印
+uv run python -m eval.run_guardrails_eval            # 拦截率 / 误拦率，CI 同款门禁
+uv run python -m eval.run_guardrails_eval --cases data/guardrails/cases_holdout.yaml
+```
+
+HTTP 入口（服务启动后）：
+
+```powershell
+$body = @{ text = "下周一来 3 个实习生，做前端的，权限给到 6 月底"; today = "2026-10-24" } | ConvertTo-Json -Compress
+Invoke-RestMethod http://127.0.0.1:8000/v1/guardrails/check -Method Post -Headers $headers -ContentType "application/json" -Body $body
+# disposition=clarify，slots.missing=["name"]，追问只问姓名
+```
+
+`masked_text` 是脱敏后的文本；PII 真实值只在进程内存的 vault 里，不会出现在响应中。
 
 ## 目录
 

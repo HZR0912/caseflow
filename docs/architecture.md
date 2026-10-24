@@ -7,6 +7,9 @@
 ```text
 用户 / curl → apps/api/main.py :8000
                ├─ Bearer → 服务端身份映射
+               ├─ /v1/guardrails/check → core/guardrails/pipeline.py
+               │    归一化 → 注入检测 → PII token 化 → 意图路由 → 槽位抽取
+               │    产出 disposition ∈ {blocked, human_review, clarify, route}
                ├─ /v1/policy/check → core/policy/opa_client.py → OPA policies/*.rego
                └─ /v1/actions/execute → 策略拒绝 403 / 允许后执行器暂返回 501
 
@@ -55,7 +58,20 @@ START → echo → approval(interrupt) → report → END
 
 已验证跨进程恢复，包括 checkpoint 提交后强杀进程。尚未连接真实工具或审批 UI。
 
+## 输入护栏（W4）
+
+```text
+文本 → normalize（NFKC / 零宽 / 空格插入 / base64 展开，保留原文索引）
+     → injection（规则命中：类别 + 权重 + 原文偏移；≥0.6 拦截）
+     → pii（校验位过滤 → 类型化占位符；真实值进请求级 vault）
+     → intent（饱和评分 + 置信度三档路由；求确认句式强制只读问答）
+     → slots（正则/枚举抽取，缺槽追问，上一轮已确认值合并）
+```
+
+护栏不做授权判断：越权与数据外泄只产出 risk 标签和 policy_action，拦截在 OPA。
+护栏与主 API 的编排尚未连通——W5 接入。详见 [ADR-0006](design-decisions/0006-input-guardrails.md)。
+
 ## 尚未实现
 
-W3 以后的护栏、RAG、记忆、MCP 工具网关、Agent 执行器与自动重试、Saga 补偿、审批台、
-Trace 回放和评测 harness。MockCorp 的供应方幂等与故障语义已完成；这些能力尚未接入 Agent 编排。
+记忆、MCP 工具网关、Agent 执行器与自动重试、Saga 补偿、审批台、Trace 回放和评测 harness，
+以及 RAG 的生成与引用标注。护栏与 RAG 目前都是独立入口，尚未接入 Agent 编排。

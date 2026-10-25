@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import MemoryPanel from "./MemoryPanel.vue";
+import BackgroundPanel from "./BackgroundPanel.vue";
+import ReconciliationPanel from "./ReconciliationPanel.vue";
 const memorySelection = ref<Record<string, unknown> | undefined>();
+const backgroundState = ref("");
 const memorySources: Record<string, string> = {
   explicit: "本次输入",
   session: "会话记忆",
@@ -44,6 +47,9 @@ const identity = ref<{
   role: string;
   tenant: string;
   can_review: boolean;
+  can_execute: boolean;
+  can_reconcile: boolean;
+  can_resolve: boolean;
 } | null>(null);
 const items = ref<Approval[]>([]),
   selected = ref<Approval | null>(null);
@@ -105,6 +111,8 @@ const messages: Record<string, string> = {
   approval_policy_denied: "当前身份无此操作权限，或策略服务不可用。",
   approval_plan_changed: "计划版本不一致，请刷新后核对。",
   approval_storage_unavailable: "审批存储暂不可用，请稍后重试。",
+  reconciliation_already_closed: "此任务已人工结案，不能再次执行。",
+  execution_policy_unavailable: "权限服务暂不可用，已保存的后台任务会按计划重试。",
 };
 async function api(path: string, init: RequestInit = {}) {
   const response = await fetch("/v1/approval-requests" + path, {
@@ -167,6 +175,7 @@ function disconnect() {
 }
 function select(item: Approval) {
   run(async () => {
+    backgroundState.value = "";
     selected.value = await api("/" + item.id);
     reason.value = "";
     decisionAttempt = null;
@@ -243,6 +252,9 @@ function execute() {
     await refresh();
     notice.value = labels[result.status] ?? result.status;
   });
+}
+function refreshProgress() {
+  if (!busy.value && identity.value) void run(refresh);
 }
 const fmt = (value: string) => new Date(value).toLocaleString("zh-CN");
 </script>
@@ -521,9 +533,21 @@ const fmt = (value: string) => new Date(value).toLocaleString("zh-CN");
               <p v-if="!selected.executable">
                 此历史审批没有可恢复的执行参数，请重新预演并提交。
               </p>
+              <BackgroundPanel
+                :key="'background-' + selected.id"
+                :request-id="selected.id"
+                :execution-status="selected.execution?.status"
+                :api="api"
+                @changed="refreshProgress"
+                @state="backgroundState = $event"
+              />
               <button
-                v-else-if="
-                  identity.can_review &&
+                v-if="
+                  selected.executable &&
+                  identity.can_execute &&
+                  !['queued', 'running', 'waiting', 'completed'].includes(
+                    backgroundState,
+                  ) &&
                   (!selected.execution ||
                     [
                       'running',
@@ -535,7 +559,13 @@ const fmt = (value: string) => new Date(value).toLocaleString("zh-CN");
                 :disabled="busy"
                 @click="execute"
               >
-                {{ selected.execution ? "恢复执行 / 重试" : "执行已批准计划" }}
+                {{
+                  backgroundState === "blocked"
+                    ? "重新授权并继续"
+                    : selected.execution
+                      ? "恢复执行 / 重试"
+                      : "执行已批准计划"
+                }}
               </button>
               <template v-if="selected.execution">
                 <p role="status">
@@ -692,6 +722,16 @@ const fmt = (value: string) => new Date(value).toLocaleString("zh-CN");
                   </p>
                 </template>
               </template>
+              <ReconciliationPanel
+                v-if="selected.execution"
+                :key="'reconciliation-' + selected.id"
+                :request-id="selected.id"
+                :execution-status="selected.execution.status"
+                :can-reconcile="identity.can_reconcile"
+                :can-resolve="identity.can_resolve"
+                :api="api"
+                @closed="refreshProgress"
+              />
             </section>
           </template>
         </article>

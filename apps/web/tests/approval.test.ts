@@ -34,7 +34,23 @@ function setup(actor = "reviewer", failOnce = false, initial: any = row) {
   const fetch = vi.fn(async (url: string, init: any) => {
     let body: any;
     if (url.endsWith("/identity"))
-      body = { id: actor, role: "admin", tenant: "test", can_review: true };
+      body = {
+        id: actor,
+        role: "admin",
+        tenant: "test",
+        can_review: true,
+        can_execute: true,
+        can_reconcile: false,
+        can_resolve: false,
+      };
+    else if (url.endsWith("/background")) body = { job: null };
+    else if (url.endsWith("/reconciliation"))
+      body = {
+        status: "not_required",
+        latest_evidence: null,
+        resolution: null,
+        events: [],
+      };
     else if (url.endsWith("/decision")) {
       decisions.push(JSON.parse(init.body));
       if (failOnce && decisions.length === 1)

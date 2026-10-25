@@ -10,7 +10,13 @@
 
 ## 当前状态
 
-**W1–W9 已实现：规划、持久审批、正式执行、幂等重放、重试、分组 Saga、三类记忆与组织模型。**
+**W1–W12 已实现：规划、持久审批、执行与补偿、记忆、追踪、评测门禁，以及后台接续与人工对账结案。**
+
+W12 补齐第二、第三项缺口：人在批准计划上点击执行后，等待或进程中断可由独立 worker
+自动继续；异常结果可核对供应方收据并明确结案，未知结果仍保留待处理。
+启动见 [后台恢复说明](docs/background-recovery.md)，实测见
+[后台恢复验证](docs/w12-background-recovery-verification.md) 与
+[异常对账验证](docs/w12-reconciliation-verification.md)。
 
 W9 新增加密会话恢复、显式个人偏好、部门/导师/系统归属及历史办理摘要。
 记忆可选择、修正、过期和遗忘；来源随审批冻结，不能绕过权限与人工审批。
@@ -51,7 +57,7 @@ W4 实现输入护栏：归一化抗变形（零宽 / 空格插入 / 全角 / ba
 | 验收项 | 状态 | 证据 |
 |---|---|---|
 | W1：compose 四服务 healthy | ✅ | 不带 profile 时仅启动 postgres / redis / opa |
-| W1：CI 检查配置（ruff + pytest + `opa test` + 迁移往返） | ✅ | 现为六个 job，含审批 UI；本轮远程 CI 尚未运行 |
+| W1：CI 检查配置（ruff + pytest + `opa test` + 迁移往返） | ✅ | 六个 job，含审批 UI、Redis、后台强杀验证；运行结果见顶部 Actions |
 | W1：策略拒绝一次请求 | ✅ | intern 请求 `admin.grant` → 403 `self_escalation_forbidden` |
 | W1：跨进程断点恢复 | ✅ | `scripts.w1_checkpoint_demo start` / `resume` 双进程验证 |
 | W2：13 个写操作 × 预演/执行/重放/瞬态失败 | ✅ | `pytest -m "not integration"`，参数化覆盖每个操作 |
@@ -79,22 +85,24 @@ W4 实现输入护栏：归一化抗变形（零宽 / 空格插入 / 全角 / ba
 | W9：组织与规划整合 | ✅ | 递归部门/导师/系统归属；三类来源补全计划并冻结审批；组织职位不授予权限 |
 | W11：评测 harness 与对抗集 | ✅ | 60 业务 + 60 对抗，每例五次；连接池修复后默认并发 4，三轮各 600/600 |
 | W11：基线门禁与报告 | ✅ | 完整性、真实收据、引用和基线比较；JSON/HTML 报告，CI 已配置；并发 8 两轮各 600/600 |
+| W12：后台自动接续 | ✅ | PostgreSQL 持久授权、Redis 唤醒；等待、补偿、撤权和故障恢复专项验证 |
+| W12：异常对账与人工结案 | ✅ | 收据与当前状态核对；证据过期/变化拒绝；结案后冻结执行 |
 
-当前测试规模：**396 项非集成 + 78 项集成**，另有 16 项前端交互测试、14 项 Rego 测试，
+当前测试规模：**405 项非集成 + 108 项集成**，另有 24 项前端交互测试、15 项 Rego 测试，
 检索评测 16 用例，护栏调参集 60 + 30、旧回归集 25 + 10、新留出集 25 + 15。
 
 连接池修复后已在本机真实 PostgreSQL + pgvector 的独立临时数据库完成迁移与集成测试：
-**78 passed，无跳过**。包括检索、预演、审批、执行、补偿、记忆、组织、并发和旧计划兼容，
-以及连接复用、锁释放、取消、池满拒绝、坏连接丢弃和生命周期关闭。
-测试后已删除临时数据库。云端 CI 尚待提交后验证；涉及 SQL 的后续改动仍须跑真实数据库测试。
+**108 passed，无跳过**。包括检索、预演、审批、执行、补偿、记忆、组织、并发和旧计划兼容，
+以及连接池、后台授权、真实 Redis 消息重建、对账与 API 鉴权。
+测试后已删除临时数据库。远程 CI 以对应提交的 Actions 结果为准；涉及 SQL 的后续改动仍须跑真实数据库测试。
 
-已知缺口：补偿人工终态尚无自动对账/结案接口；长等待仍需显式恢复。
+已知缺口：缺少收据的未知执行仍需人工进一步核实；真实供应方取消屏障、worker 告警与生产容量验收尚未实现。
 MCP 工具、自由问答生成与 rerank 尚未实现。Trace 回放和规则评测 harness 已实现。
 记忆当前是显式结构化实现，使用哈希向量；自由对话自动长期抽取、HR 同步和后台清理尚未实现。
 W7 需稳定的 `EXECUTION_ENCRYPTION_KEY`；旧审批没有原始执行参数，必须重新预演审批。
 W5 默认本地制度检索并返回经原文校验的引文，规划采用入职模板；可选模型只补充缺失槽位。
 护栏是规则实现（语义级改写会漏）；W5 已对检索片段单独扫描间接注入，不能保证全拦截。
-MockCorp 的供应方原子幂等已接入执行器；长 Retry-After 或中断后需再次显式恢复。
+MockCorp 的供应方原子幂等已接入执行器；有持久执行授权且 worker 运行时，长 Retry-After 或中断后自动接续。
 
 ## 快速开始
 
@@ -138,13 +146,13 @@ $body | curl.exe --silent --show-error -i http://127.0.0.1:8000/v1/actions/execu
 
 此演示的 `$token` 和 `$env:AUTH_CREDENTIALS` 只保存在当前 shell 中；新窗口需重新生成并重建 API 容器，
 或自行将摘要映射保存到不入库的 `.env`（`AUTH_CREDENTIALS` 为 JSON 数组）并妥善保管原始 token。
-撤销或更改角色需要修改服务端配置并重启 API。该机制是开发阶段的静态凭据映射，尚未接入企业 SSO，
+撤销或更改角色需要同步修改服务端配置并重新创建 API、worker 和 MockCorp 容器。该机制是开发阶段的静态凭据映射，尚未接入企业 SSO，
 也不代表已实现租户资源隔离。设计取舍见 [ADR-0002](docs/design-decisions/0002-trusted-api-identity.md)。
 
 若需要本机热重载，在完成上述凭据配置后使用以下方式，避免同时运行容器 API 占用 8000 端口：
 
 ```powershell
-docker compose --profile app stop api
+docker compose --profile app stop api worker
 docker compose up -d              # 仅 postgres / redis / opa
 uv run alembic upgrade head
 uv run uvicorn apps.api.main:app --reload --port 8000
@@ -213,6 +221,7 @@ core/graph/        LangGraph 状态机、状态定义、子图
 core/memory/       三类记忆（W9）
 core/rag/          检索 / 融合 / 精排 / 版本冲突（W3）
 core/tools/        W7 执行器、HTTP 网关、加密计划、幂等重试与 W8 Saga
+core/jobs/         W12 持久执行授权、独立 worker 与后台接续
 core/policy/       OPA 客户端与策略调用
 core/obs/          OTel、成本计量（W10）
 eval/              场景 DSL、runner、确定性断言与基线门禁（W11）

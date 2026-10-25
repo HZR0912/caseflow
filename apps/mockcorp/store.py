@@ -102,6 +102,27 @@ class PostgresStore:
             conn.execute("SELECT 1 FROM mockcorp_receipts LIMIT 1")
             conn.execute("SELECT 1 FROM mockcorp_oplog LIMIT 1")
 
+    def reconciliation_evidence(self, tenant, targets):
+        from core.tools.compensation import compensation_key
+
+        from apps.mockcorp.reconciliation import receipt_evidence
+
+        with self._connect() as conn:
+            # Writes take FOR UPDATE on the same tenant row. Keep its SHARE lock
+            # until all receipts and affected state have been inspected together.
+            row = conn.execute(
+                "SELECT state FROM mockcorp_state WHERE tenant=%s FOR SHARE", (tenant,)
+            ).fetchone()
+            state = row[0] if row else initial_state(self.settings)
+            keys = [key for t in targets for key in (t.key, compensation_key(t.key))]
+            rows = conn.execute(
+                "SELECT key,fingerprint,status_code,response FROM mockcorp_receipts "
+                "WHERE tenant=%s AND key=ANY(%s)",
+                (tenant, keys),
+            ).fetchall()
+            receipts = {r[0]: {"fingerprint": r[1], "status": r[2], "body": r[3]} for r in rows}
+            return [receipt_evidence(state, receipts, target) for target in targets]
+
     def snapshot(self, tenant: str) -> dict:
         with self._connect() as conn:
             row = conn.execute(

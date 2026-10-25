@@ -13,8 +13,6 @@ from core.graph.providers import FallbackInterpreter
 from core.graph.workflow import HttpPreviewClient, build_planning_graph
 from core.memory.recall import RecallInterpreter
 from core.memory.service import MemoryService
-from core.tools.execution import ExecutionService
-from core.tools.gateway import HttpToolGateway
 from core.tools.payload import PreparedApproval
 from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import FileResponse
@@ -46,6 +44,9 @@ async def identity(subject: SubjectDep, service: ApprovalDep):
     return {
         **subject.model_dump(),
         "can_review": await service.permitted(subject, "approval.decide"),
+        "can_execute": await service.permitted(subject, "approval.execute"),
+        "can_reconcile": await service.permitted(subject, "approval.reconcile"),
+        "can_resolve": await service.permitted(subject, "approval.resolve"),
     }
 
 
@@ -109,13 +110,19 @@ async def recover(request_id: UUID, subject: SubjectDep, service: ApprovalDep, r
 
 @router.post("/v1/approval-requests/{request_id}/execute", tags=["execution"])
 async def execute(request_id: UUID, subject: SubjectDep, service: ApprovalDep, request: Request):
-    gateway = HttpToolGateway(get_settings().mockcorp_url, request.headers["authorization"])
     async with observe_existing(request, service, subject, request_id, "execution.run") as frame:
-        result = await ExecutionService(service, gateway).execute(str(request_id), subject)
+        result = await request.app.state.background_jobs.execute(
+            str(request_id), subject, request.headers["authorization"]
+        )
         if frame is not None:
             frame.output = {"status": result["status"]}
             frame.status = "ok" if result["status"] == "succeeded" else "error"
         return result
+
+
+@router.get("/v1/approval-requests/{request_id}/background", tags=["execution"])
+async def background(request_id: UUID, subject: SubjectDep, request: Request):
+    return await request.app.state.background_jobs.get(str(request_id), subject)
 
 
 @asynccontextmanager

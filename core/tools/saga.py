@@ -147,8 +147,10 @@ class Saga:
                         return journal
                     if remaining > 0:
                         await asyncio.sleep(remaining)
+                if executor.identity_guard is not None:
+                    executor.identity_guard()
                 step = by_id[item["step_id"]]
-                decision = await executor.approvals.policy.authorize(
+                decision = await executor.authorize(
                     PolicyQuery(
                         subject=subject,
                         action=UNDO_ACTIONS[item["operation"]],

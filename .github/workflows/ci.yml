@@ -98,14 +98,22 @@ jobs:
         with:
           version: ${{ env.OPA_VERSION }}
       - name: Rego 格式检查
-        run: opa fmt --diff --fail policies
+        run: opa fmt --diff --fail policies tests/policies
       - name: Rego 单测
-        run: opa test policies -v
+        run: opa test policies tests/policies -v
 
   # 5) 真 postgres：迁移往返、checkpoint 恢复、MockCorp 并发事务及 HTTP 超时重启。
   integration:
     runs-on: ubuntu-latest
     services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
       postgres:
         image: pgvector/pgvector:pg16
         env:
@@ -120,6 +128,7 @@ jobs:
           --health-retries 20
     env:
       DATABASE_URL: postgresql://caseflow:caseflow_dev_pw@127.0.0.1:5432/caseflow
+      REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v9.0.0
@@ -146,6 +155,8 @@ jobs:
           uv run python -m scripts.w6_approval_demo --check
       - name: W7 幂等执行、429 退避与提交后强杀恢复
         run: uv run python -m scripts.w7_execution_demo --check
+      - name: W12 API 与 worker 强杀后的自动接续
+        run: uv run python -m scripts.verify_background_process
       - name: W8 分组补偿、部分成功与退款提交后强杀恢复
         run: uv run python -m scripts.w8_saga_demo --check
       - name: W9 三类记忆、组织归属、重启与隔离
@@ -160,4 +171,11 @@ jobs:
         with:
           name: w11-evaluation
           path: eval/results/w11-current.*
+          if-no-files-found: warn
+      - name: 保存后台进程恢复证据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: background-process-verification
+          path: eval/results/background-process.json
           if-no-files-found: warn

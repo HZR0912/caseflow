@@ -35,86 +35,134 @@ def idempotency_key(tenant, request_id, plan_hash, step, arguments):
 
 
 class ExecutionService:
-    def __init__(self, approvals, gateway, retry=None):
+    def __init__(self, approvals, gateway, retry=None, *, identity_guard=None):
         self.approvals, self.gateway = approvals, gateway
         self.retry = retry or RetryPolicy()
+        self.identity_guard = identity_guard
 
-    async def execute(self, request_id, subject):
-        service = self.approvals
-        # Same lock namespace as approval: decisions/recovery/execution cannot race.
-        async with service.session(request_id) as (conn, graph):
-            row = await service.row(conn, request_id, subject)
-            await service.require(subject, "approval.execute", request_id)
-            if digest(row["snapshot"]) != row["plan_hash"]:
-                raise ApprovalError(409, "approval_plan_changed")
-            decision = row["decision"] or {}
-            if (
-                decision.get("decision") != "approve"
-                or decision.get("plan_hash") != row["plan_hash"]
-            ):
-                raise ApprovalError(409, "execution_requires_approval")
-            state = await graph.aget_state(service.config(request_id))
-            if state.next or state.values.get("status") != "approved_ready":
-                raise ApprovalError(409, "approval_recovery_required")
-            if service.cipher is None:
-                raise ApprovalError(503, "execution_key_not_configured")
-            if not row.get("execution_payload"):
-                raise ApprovalError(409, "legacy_approval_resubmit_required")
-            try:
-                plan = service.cipher.open(row["execution_payload"], subject.tenant, request_id)
-            except ValueError as exc:
-                raise ApprovalError(409, "execution_payload_invalid") from exc
-            if digest(plan.model_dump(mode="json", exclude_unset=True)) != row["snapshot"].get(
-                "execution_plan_hash"
-            ):
-                raise ApprovalError(409, "execution_plan_changed")
-            cursor = await conn.execute(
-                "SELECT journal FROM execution_runs WHERE request_id=%s", (request_id,)
-            )
-            saved = await cursor.fetchone()
-            journal = saved["journal"] if saved else None
-            if journal and journal["status"] in {"compensating", "compensation_waiting"}:
-                return await Saga(self).run(conn, plan, journal, subject)
-            if journal and journal["status"] not in {"running", "retry_waiting"}:
-                if (
-                    plan.saga_version == 1
-                    and "saga" not in journal
-                    and journal["status"]
-                    in {
-                        "compensation_required",
-                        "human_required",
-                        "retry_exhausted",
-                        "partial_success",
-                    }
-                ):
-                    return await Saga(self).run(conn, plan, journal, subject)
-                return journal
-            if journal is None:
-                if datetime.now(UTC) >= row["expires_at"]:
-                    raise ApprovalError(409, "execution_approval_expired")
-                journal = {
-                    "request_id": request_id,
-                    "plan_hash": row["plan_hash"],
-                    "status": "running",
-                    "steps": [
-                        {
-                            "step_id": step.id,
-                            "operation": step.operation,
-                            "status": "not_started",
-                            "attempts": 0,
-                            "events": [],
-                        }
-                        for step in plan.ordered_steps()
-                    ],
-                }
-            result = await self.drive(conn, row, plan, journal, subject)
-            if plan.saga_version == 1 and result["status"] not in {
-                "succeeded",
+    @staticmethod
+    def can_continue(plan, journal):
+        return (
+            journal is None
+            or journal["status"]
+            in {
                 "running",
                 "retry_waiting",
-            }:
-                return await Saga(self).run(conn, plan, result, subject)
-            return result
+                "compensating",
+                "compensation_waiting",
+            }
+            or (
+                plan.saga_version == 1
+                and "saga" not in journal
+                and journal["status"]
+                in {
+                    "compensation_required",
+                    "human_required",
+                    "retry_exhausted",
+                    "partial_success",
+                }
+            )
+        )
+
+    async def execute(self, request_id, subject):
+        # The same lock protects decisions, recovery, execution and reconciliation.
+        async with self.approvals.session(request_id) as (conn, graph):
+            prepared = await self.prepare(conn, graph, request_id, subject)
+            return await self.run_prepared(conn, *prepared, subject)
+
+    async def prepare(self, conn, graph, request_id, subject):
+        """Validate under the caller-owned request lock, before recording execution consent."""
+        service = self.approvals
+        row = await service.row(conn, request_id, subject)
+        if self.identity_guard is None:
+            await service.require(subject, "approval.execute", request_id)
+        else:
+            decision = await self.authorize(
+                PolicyQuery(
+                    subject=subject,
+                    action="approval.execute",
+                    resource=PolicyResource(type="approval_request", id=request_id),
+                )
+            )
+            if not decision.allow:
+                raise ApprovalError(403, "approval_policy_denied")
+        if digest(row["snapshot"]) != row["plan_hash"]:
+            raise ApprovalError(409, "approval_plan_changed")
+        decision = row["decision"] or {}
+        if decision.get("decision") != "approve" or decision.get("plan_hash") != row["plan_hash"]:
+            raise ApprovalError(409, "execution_requires_approval")
+        state = await graph.aget_state(service.config(request_id))
+        if state.next or state.values.get("status") != "approved_ready":
+            raise ApprovalError(409, "approval_recovery_required")
+        if service.cipher is None:
+            raise ApprovalError(503, "execution_key_not_configured")
+        if not row.get("execution_payload"):
+            raise ApprovalError(409, "legacy_approval_resubmit_required")
+        try:
+            plan = service.cipher.open(row["execution_payload"], subject.tenant, request_id)
+        except ValueError as exc:
+            raise ApprovalError(409, "execution_payload_invalid") from exc
+        if digest(plan.model_dump(mode="json", exclude_unset=True)) != row["snapshot"].get(
+            "execution_plan_hash"
+        ):
+            raise ApprovalError(409, "execution_plan_changed")
+        cursor = await conn.execute(
+            "SELECT journal FROM execution_runs WHERE request_id=%s", (request_id,)
+        )
+        saved = await cursor.fetchone()
+        journal = saved["journal"] if saved else None
+        cursor = await conn.execute(
+            "SELECT 1 FROM reconciliation_resolutions WHERE request_id=%s", (request_id,)
+        )
+        if await cursor.fetchone():
+            raise ApprovalError(409, "reconciliation_already_closed")
+        if journal is None and datetime.now(UTC) >= row["expires_at"]:
+            raise ApprovalError(409, "execution_approval_expired")
+        return row, plan, journal
+
+    async def run_prepared(self, conn, row, plan, journal, subject):
+        """Drive a validated immutable plan while still holding its request lock."""
+        request_id = row["id"]
+        if journal and journal["status"] in {"compensating", "compensation_waiting"}:
+            return await Saga(self).run(conn, plan, journal, subject)
+        if journal and journal["status"] not in {"running", "retry_waiting"}:
+            if (
+                plan.saga_version == 1
+                and "saga" not in journal
+                and journal["status"]
+                in {
+                    "compensation_required",
+                    "human_required",
+                    "retry_exhausted",
+                    "partial_success",
+                }
+            ):
+                return await Saga(self).run(conn, plan, journal, subject)
+            return journal
+        if journal is None:
+            journal = {
+                "request_id": request_id,
+                "plan_hash": row["plan_hash"],
+                "status": "running",
+                "steps": [
+                    {
+                        "step_id": step.id,
+                        "operation": step.operation,
+                        "status": "not_started",
+                        "attempts": 0,
+                        "events": [],
+                    }
+                    for step in plan.ordered_steps()
+                ],
+            }
+        result = await self.drive(conn, row, plan, journal, subject)
+        if plan.saga_version == 1 and result["status"] not in {
+            "succeeded",
+            "running",
+            "retry_waiting",
+        }:
+            return await Saga(self).run(conn, plan, result, subject)
+        return result
 
     async def save(self, conn, journal):
         await conn.execute(
@@ -122,6 +170,12 @@ class ExecutionService:
             "ON CONFLICT(request_id) DO UPDATE SET journal=EXCLUDED.journal,updated_at=now()",
             (journal["request_id"], Jsonb(journal)),
         )
+
+    async def authorize(self, query):
+        decision = await self.approvals.policy.authorize(query)
+        if self.identity_guard is not None and decision.degraded:
+            raise ApprovalError(503, "execution_policy_unavailable")
+        return decision
 
     async def drive(self, conn, row, plan, journal, subject):
         results = {
@@ -155,11 +209,13 @@ class ExecutionService:
                         return journal
                     if remaining > 0:
                         await asyncio.sleep(remaining)
+                if self.identity_guard is not None:
+                    self.identity_guard()
                 actions = [step.operation]
                 if args.get("permission") == "admin":
                     actions.append("admin.grant")
                 for action in actions:
-                    allowed = await self.approvals.policy.authorize(
+                    allowed = await self.authorize(
                         PolicyQuery(
                             subject=subject,
                             action=action,

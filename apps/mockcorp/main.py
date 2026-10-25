@@ -32,6 +32,7 @@ from apps.mockcorp.models import (
     SetPermission,
 )
 from apps.mockcorp.preview import preview_plan
+from apps.mockcorp.reconciliation import router as reconciliation_router
 from apps.mockcorp.service import MockCorp
 from apps.mockcorp.store import PostgresStore, Store
 
@@ -98,6 +99,7 @@ def create_app(store: Store | None = None, settings: MockSettings | None = None)
     )
     if store is not None:
         app.state.mockcorp = MockCorp(store, config)
+    app.include_router(reconciliation_router)
 
     @app.exception_handler(psycopg.Error)
     def database_error(request: Request, exc: psycopg.Error):

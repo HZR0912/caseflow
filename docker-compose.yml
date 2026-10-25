@@ -92,6 +92,8 @@ services:
       MOCKCORP_URL: http://mockcorp:8001
       PLANNING_PROVIDERS: ${PLANNING_PROVIDERS:-[]}
       APPROVAL_TTL_HOURS: ${APPROVAL_TTL_HOURS:-24}
+      BACKGROUND_AUTHORIZATION_HOURS: ${BACKGROUND_AUTHORIZATION_HOURS:-24}
+      BACKGROUND_MAX_FAILURES: ${BACKGROUND_MAX_FAILURES:-6}
       EXECUTION_ENCRYPTION_KEY: ${EXECUTION_ENCRYPTION_KEY:-}
       OBSERVATION_ENABLED: ${OBSERVATION_ENABLED:-false}
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
@@ -118,10 +120,12 @@ services:
         condition: service_healthy
       opa:
         condition: service_healthy
+      mockcorp:
+        condition: service_healthy
     logging: *default-logging
 
   mockcorp:
-    profiles: ["mockcorp"]
+    profiles: ["app", "mockcorp"]
     build:
       context: .
       dockerfile: docker/api/Dockerfile
@@ -148,6 +152,34 @@ services:
       start_period: 10s
     depends_on:
       postgres:
+        condition: service_healthy
+    logging: *default-logging
+
+  worker:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    command: ["uv", "run", "--no-sync", "python", "-m", "core.jobs.worker"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-caseflow}:${POSTGRES_PASSWORD:-caseflow_dev_pw}@postgres:5432/${POSTGRES_DB:-caseflow}
+      REDIS_URL: redis://redis:6379/0
+      OPA_URL: http://opa:8181
+      MOCKCORP_URL: http://mockcorp:8001
+      AUTH_CREDENTIALS: ${AUTH_CREDENTIALS:-[]}
+      EXECUTION_ENCRYPTION_KEY: ${EXECUTION_ENCRYPTION_KEY:-}
+      BACKGROUND_AUTHORIZATION_HOURS: ${BACKGROUND_AUTHORIZATION_HOURS:-24}
+      BACKGROUND_MAX_FAILURES: ${BACKGROUND_MAX_FAILURES:-6}
+      OBSERVATION_ENABLED: ${OBSERVATION_ENABLED:-false}
+    depends_on:
+      api:
+        condition: service_healthy
+      mockcorp:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opa:
         condition: service_healthy
     logging: *default-logging
 

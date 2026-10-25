@@ -21,6 +21,7 @@ from core.graph.onboarding import PlanningRequest
 from core.graph.providers import FallbackInterpreter
 from core.graph.workflow import HttpPreviewClient, build_planning_graph
 from core.guardrails.pipeline import Guardrails
+from core.jobs.service import BackgroundJobs
 from core.memory.recall import RecallInterpreter
 from core.obs.runtime import Runtime
 from core.policy.opa_client import PolicyClient, PolicyQuery, PolicyResource, PolicySubject
@@ -35,7 +36,8 @@ from apps.api.approvals import router as approval_router
 from apps.api.auth import SubjectDep
 from apps.api.memory import MemoryDep
 from apps.api.memory import router as memory_router
-from apps.api.settings import get_settings
+from apps.api.reconciliation import router as reconciliation_router
+from apps.api.settings import Settings, get_settings
 from apps.api.traces import router as trace_router
 
 
@@ -54,6 +56,7 @@ async def lifespan(app: FastAPI):
         else None,
         pool=pool,
     )
+    app.state.background_jobs = BackgroundJobs(app.state.approvals, Settings)
     try:
         await pool.open()
         yield
@@ -72,6 +75,7 @@ app = FastAPI(
 app.include_router(approval_router)
 app.include_router(memory_router)
 app.include_router(trace_router)
+app.include_router(reconciliation_router)
 app.mount(
     "/approval-assets",
     StaticFiles(directory=WEB_DIST, check_dir=False),

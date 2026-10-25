@@ -18,6 +18,7 @@
 | [0012](0012-observability.md) | 显式 OTel、独立持久回放与可选 Langfuse | 已接受 |
 | [0013](0013-evaluation-gate.md) | 真实收据评测、五次全通过与显式版本基线 | 已接受 |
 | [0014](0014-bounded-database-pools.md) | 有界数据库连接池、显式解锁与并发回归 | 已接受 |
+| [0015](0015-background-and-reconciliation.md) | 持久执行授权、后台接续与收据对账结案 | 已接受 |
 
 ## 写 ADR 的规矩
 

@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     opa_timeout_s: float = 2.0
     mockcorp_url: str = "http://127.0.0.1:8001"
     approval_ttl_hours: int = Field(default=24, ge=1, le=168)
+    background_authorization_hours: int = Field(default=24, ge=1, le=168)
+    background_max_failures: int = Field(default=6, ge=1, le=20)
     execution_encryption_key: SecretStr = Field(default=SecretStr(""), repr=False)
     planning_providers: list[PlanningProvider] = Field(default_factory=list, repr=False)
     env: str = "dev"

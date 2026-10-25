@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "checks": [
+    "api_hard_kill_after_remote_commit",
+    "worker_hard_kill_after_remote_commit",
+    "normal_due_time_automatic_restart_recovery",
+    "same_idempotency_key_replayed_twice",
+    "twelve_effects_no_duplicates",
+    "completed_credential_erased"
+  ],
+  "api_pid": 236864,
+  "killed_worker_pid": 262764,
+  "restarted_worker_pid": 89560,
+  "worker_runs": 2,
+  "business_commits": 12,
+  "replays": 2,
+  "steps": 12,
+  "due_time_accelerated": false
+}

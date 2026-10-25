@@ -25,12 +25,12 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def postgres_context():
+def postgres_context(supplier_connections):
     url = os.getenv("DATABASE_URL")
     if not url:
         pytest.skip("DATABASE_URL required for real PostgreSQL integration")
     settings = MockSettings(_env_file=None, faults_enabled=True, fault_delay_s=0.01)
-    store = PostgresStore(url, settings)
+    store = PostgresStore(url, settings, pool=supplier_connections)
     tenant = "mockcorp-test-" + uuid4().hex
     store.health()
     try:

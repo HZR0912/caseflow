@@ -1,0 +1,47 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "case": "missing_trial",
+      "exit_code": 1,
+      "rejected": true,
+      "errors": [
+        "missing, duplicate or unexpected trials"
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "duplicate_trial",
+      "exit_code": 1,
+      "rejected": true,
+      "errors": [
+        "missing, duplicate or unexpected trials"
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "forged_quote",
+      "exit_code": 1,
+      "rejected": true,
+      "errors": [
+        "citation receipts invalid: adv-fabricate-01"
+      ],
+      "failed_checks": []
+    },
+    {
+      "case": "baseline_mismatch",
+      "exit_code": 1,
+      "rejected": true,
+      "errors": [],
+      "failed_checks": [
+        "baseline_matches_policy_digest"
+      ]
+    },
+    {
+      "case": "baseline_overwrite",
+      "exit_code": 1,
+      "rejected": true,
+      "unchanged": true
+    }
+  ]
+}

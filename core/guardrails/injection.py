@@ -87,6 +87,34 @@ class InjectionReport:
 # 每个规则要求"动词 + 对象"同时出现，避免把「忽略之前的审批流程」这种正常业务话误判——
 # 「忽略 + 指令/规则/设定」才是覆盖指令，「忽略 + 流程/审批」只是抱怨。
 RULES: tuple[Rule, ...] = (
+    Rule(
+        "promote-user-text-to-system",
+        "formatting_spoof",
+        0.8,
+        re.compile(r"(?:当作|当成|视为)[^。；\n]{0,24}系统提示(?:词)?"),
+        "要求把用户内容提升为系统提示",
+    ),
+    Rule(
+        "forget-assistant-identity",
+        "role_escape",
+        0.8,
+        re.compile(r"(?:忘记|忘掉)你是谁"),
+        "要求遗忘助手身份",
+    ),
+    Rule(
+        "ignore-conversation",
+        "instruction_override",
+        0.8,
+        re.compile(r"忽略[^，。；\n]{0,16}对话"),
+        "要求忽略既有对话上下文",
+    ),
+    Rule(
+        "authorization-follow-command",
+        "authority_spoof",
+        0.7,
+        re.compile(r"授权说明[^。；\n]{0,24}(?:请照做|照此执行|按此执行)"),
+        "用授权说明要求直接执行",
+    ),
     # ---- instruction_override：要求模型放弃原有规则
     Rule(
         "instruction-override-zh",

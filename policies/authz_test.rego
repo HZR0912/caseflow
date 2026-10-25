@@ -1,7 +1,24 @@
 package caseflow.authz_test
 
+test_trace_read_scopes if {
+	every role in ["admin", "employee", "team_lead"] {
+		authz.allow with input as {"user": {"role": role}, "action": "trace.read"}
+	}
+	authz.allow with input as {"user": {"role": "admin"}, "action": "trace.read_all"}
+	not authz.allow with input as {"user": {"role": "employee"}, "action": "trace.read_all"}
+	not authz.allow with input as {"user": {"role": "intern"}, "action": "trace.read"}
+}
+
 import data.caseflow.authz
 import rego.v1
+
+test_only_admin_can_approve if {
+	every action in ["approval.create", "approval.read", "approval.decide"] {
+		authz.allow with input as {"user": {"role": "admin"}, "action": action}
+		not authz.allow with input as {"user": {"role": "team_lead"}, "action": action}
+		not authz.allow with input as {"user": {"role": "intern"}, "action": action}
+	}
+}
 
 # opa test policies/ -v    ← CI 里跑这一条
 # 策略先写单测再接服务，这是 ADR-0001 里承诺的做法。
@@ -56,4 +73,16 @@ test_valid_namespace_actions_allowed if {
 	every action in ["code.invite_member", "code.repo.create", "ticket.create"] {
 		authz.allow with input as {"user": {"id": "u_2", "role": "team_lead"}, "action": action, "resource": {"type": "repo"}}
 	}
+}
+
+test_memory_is_personal_and_org_write_requires_admin if {
+	every role in ["admin", "team_lead", "employee"] {
+		authz.allow with input as {"user": {"role": role}, "action": "memory.read"}
+		authz.allow with input as {"user": {"role": role}, "action": "memory.write"}
+		authz.allow with input as {"user": {"role": role}, "action": "organization.read"}
+	}
+	authz.allow with input as {"user": {"role": "admin"}, "action": "organization.write"}
+	not authz.allow with input as {"user": {"role": "team_lead"}, "action": "organization.write"}
+	not authz.allow with input as {"user": {"role": "employee"}, "action": "organization.write"}
+	not authz.allow with input as {"user": {"role": "intern"}, "action": "memory.read"}
 }

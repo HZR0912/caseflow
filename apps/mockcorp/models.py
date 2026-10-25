@@ -83,3 +83,8 @@ class BindSeat(Input):
 class Refund(Input):
     order_id: Identifier
     amount_cents: Cents
+
+
+class CompensationRequest(Input):
+    source_key: str = Field(pattern=r"^[A-Za-z0-9._:-]{1,200}$")
+    operation: str = Field(pattern=r"^[a-z]+\.[a-z_]+$")

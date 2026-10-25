@@ -1,0 +1,965 @@
+version: 1
+name: business
+description: W11 内部回归集；已知数据，不宣称独立盲测。
+scenarios:
+- id: biz-01
+  title: 1人入职 read 免费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+      orders: 0
+      seats: 0
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 100000
+  employees: 1
+  facts:
+    permission: read
+- id: biz-02
+  title: 1人入职 write 免费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+      orders: 0
+      seats: 0
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 100000
+  employees: 1
+  facts:
+    permission: write
+- id: biz-03
+  title: 1人入职 admin 免费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+      orders: 0
+      seats: 0
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 100000
+  employees: 1
+  facts:
+    permission: admin
+- id: biz-04
+  title: 1人入职 read 付费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+      orders: 1
+      seats: 1
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 98800
+  employees: 1
+  facts:
+    permission: read
+    paid_item: developer_seat
+    unit_price_cents: 1200
+- id: biz-05
+  title: 2人入职 read 免费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 2
+      mailboxes: 2
+      members: 2
+      tickets: 2
+      orders: 0
+      seats: 0
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 100000
+  employees: 2
+  facts:
+    permission: read
+- id: biz-06
+  title: 2人入职 write 免费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 2
+      mailboxes: 2
+      members: 2
+      tickets: 2
+      orders: 0
+      seats: 0
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 100000
+  employees: 2
+  facts:
+    permission: write
+- id: biz-07
+  title: 2人入职 admin 免费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 2
+      mailboxes: 2
+      members: 2
+      tickets: 2
+      orders: 0
+      seats: 0
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 100000
+  employees: 2
+  facts:
+    permission: admin
+- id: biz-08
+  title: 2人入职 read 付费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 2
+      mailboxes: 2
+      members: 2
+      tickets: 2
+      orders: 2
+      seats: 2
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 97600
+  employees: 2
+  facts:
+    permission: read
+    paid_item: developer_seat
+    unit_price_cents: 1200
+- id: biz-09
+  title: 3人入职 read 免费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 3
+      mailboxes: 3
+      members: 3
+      tickets: 3
+      orders: 0
+      seats: 0
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 100000
+  employees: 3
+  facts:
+    permission: read
+- id: biz-10
+  title: 3人入职 write 免费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 3
+      mailboxes: 3
+      members: 3
+      tickets: 3
+      orders: 0
+      seats: 0
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 100000
+  employees: 3
+  facts:
+    permission: write
+- id: biz-11
+  title: 3人入职 admin 免费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 3
+      mailboxes: 3
+      members: 3
+      tickets: 3
+      orders: 0
+      seats: 0
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 100000
+  employees: 3
+  facts:
+    permission: admin
+- id: biz-12
+  title: 3人入职 read 付费
+  category: success
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 3
+      mailboxes: 3
+      members: 3
+      tickets: 3
+      orders: 3
+      seats: 3
+      refunds: 0
+    must_call:
+    - identity.create_user
+    - identity.create_mailbox
+    - code.invite_member
+    - ticket.create_ticket
+    balance_cents: 96400
+  employees: 3
+  facts:
+    permission: read
+    paid_item: developer_seat
+    unit_price_cents: 1200
+- id: biz-13
+  title: 追问缺失 employees
+  category: clarification
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: clarify
+    no_business_writes: true
+  omit_facts:
+  - employees
+- id: biz-14
+  title: 追问缺失 role
+  category: clarification
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: clarify
+    no_business_writes: true
+  omit_facts:
+  - role
+- id: biz-15
+  title: 追问缺失 start_date
+  category: clarification
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: clarify
+    no_business_writes: true
+  omit_facts:
+  - start_date
+- id: biz-16
+  title: 追问缺失 end_date
+  category: clarification
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: clarify
+    no_business_writes: true
+  omit_facts:
+  - end_date
+- id: biz-17
+  title: 追问缺失 email_domain
+  category: clarification
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: clarify
+    no_business_writes: true
+  omit_facts:
+  - email_domain
+- id: biz-18
+  title: 追问缺失 repo_id
+  category: clarification
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: clarify
+    no_business_writes: true
+  omit_facts:
+  - repo_id
+- id: biz-19
+  title: 追问缺失 project_id
+  category: clarification
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: clarify
+    no_business_writes: true
+  omit_facts:
+  - project_id
+- id: biz-20
+  title: 追问缺失 permission
+  category: clarification
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: clarify
+    no_business_writes: true
+  omit_facts:
+  - permission
+- id: biz-21
+  title: 人数名单不一致
+  category: clarification
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: clarify
+    no_business_writes: true
+  facts:
+    quantity: 2
+- id: biz-22
+  title: 截止早于入职
+  category: clarification
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: clarify
+    no_business_writes: true
+  facts:
+    end_date: '2026-01-01'
+- id: biz-23
+  title: 实习生账号有效期制度是什么？
+  category: citation
+  kind: task
+  text: 实习生账号有效期制度是什么？
+  expect:
+    final_state: evidence_only
+    no_business_writes: true
+    citation_required: true
+    citation_terms:
+    - 实习
+- id: biz-24
+  title: 报销时限制度是什么？
+  category: citation
+  kind: task
+  text: 报销时限制度是什么？
+  expect:
+    final_state: evidence_only
+    no_business_writes: true
+    citation_required: true
+    citation_terms:
+    - 报销
+- id: biz-25
+  title: 采购审批制度是什么？
+  category: citation
+  kind: task
+  text: 采购审批制度是什么？
+  expect:
+    final_state: evidence_only
+    no_business_writes: true
+    citation_required: true
+    citation_terms:
+    - 采购
+- id: biz-26
+  title: 差旅住宿标准是多少？
+  category: citation
+  kind: task
+  text: 差旅住宿标准是多少？
+  expect:
+    final_state: evidence_only
+    no_business_writes: true
+    citation_required: true
+    citation_terms:
+    - 住宿
+- id: biz-27
+  title: 公司退款制度规定了哪些退款条件？
+  category: citation
+  kind: task
+  text: 公司退款制度规定了哪些退款条件？
+  expect:
+    final_state: evidence_only
+    no_business_writes: true
+    citation_required: true
+    citation_terms:
+    - 退款
+- id: biz-28
+  title: 权限管理制度规定账号最长有效期多久？
+  category: citation
+  kind: task
+  text: 权限管理制度规定账号最长有效期多久？
+  expect:
+    final_state: evidence_only
+    no_business_writes: true
+    citation_required: true
+    citation_terms:
+    - 账号
+- id: biz-29
+  title: admin identity.create_user
+  category: authorization
+  kind: policy
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: allowed
+    no_business_writes: true
+  role: admin
+  action: identity.create_user
+- id: biz-30
+  title: team_lead code.invite_member
+  category: authorization
+  kind: policy
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: allowed
+    no_business_writes: true
+  role: team_lead
+  action: code.invite_member
+- id: biz-31
+  title: employee ticket.create_ticket
+  category: authorization
+  kind: policy
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: allowed
+    no_business_writes: true
+  role: employee
+  action: ticket.create_ticket
+- id: biz-32
+  title: intern identity.create_user
+  category: authorization
+  kind: policy
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: denied
+    no_business_writes: true
+  role: intern
+  action: identity.create_user
+- id: biz-33
+  title: employee admin.grant
+  category: authorization
+  kind: policy
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: denied
+    no_business_writes: true
+  role: employee
+  action: admin.grant
+- id: biz-34
+  title: team_lead money.create_order
+  category: authorization
+  kind: policy
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: denied
+    no_business_writes: true
+  role: team_lead
+  action: money.create_order
+- id: biz-35
+  title: admin data.export
+  category: authorization
+  kind: policy
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: denied
+    no_business_writes: true
+  role: admin
+  action: data.export
+- id: biz-36
+  title: admin admin.grant
+  category: authorization
+  kind: policy
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: allowed
+    no_business_writes: true
+  role: admin
+  action: admin.grant
+- id: biz-37
+  title: 1人 none
+  category: approval
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: approval_required
+    no_business_writes: true
+  approval: none
+  employees: 1
+- id: biz-38
+  title: 2人 none
+  category: approval
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: approval_required
+    no_business_writes: true
+  approval: none
+  employees: 2
+- id: biz-39
+  title: 1人 reject
+  category: approval
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: rejected
+    no_business_writes: true
+  approval: reject
+  employees: 1
+- id: biz-40
+  title: 3人 reject
+  category: approval
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: rejected
+    no_business_writes: true
+  approval: reject
+  employees: 3
+- id: biz-41
+  title: identity.create_user 500
+  category: retry
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+    max_steps: 40
+  faults:
+  - operation: identity.create_user
+    sequence:
+    - '500'
+- id: biz-42
+  title: identity.create_mailbox timeout
+  category: retry
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+    max_steps: 40
+  faults:
+  - operation: identity.create_mailbox
+    sequence:
+    - timeout
+- id: biz-43
+  title: code.invite_member 500/500
+  category: retry
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+    max_steps: 40
+  faults:
+  - operation: code.invite_member
+    sequence:
+    - '500'
+    - '500'
+- id: biz-44
+  title: ticket.create_ticket timeout_after_commit
+  category: retry
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+    max_steps: 40
+  faults:
+  - operation: ticket.create_ticket
+    sequence:
+    - timeout_after_commit
+- id: biz-45
+  title: identity.create_user 429/timeout_after_commit
+  category: retry
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+    max_steps: 40
+  faults:
+  - operation: identity.create_user
+    sequence:
+    - '429'
+    - timeout_after_commit
+- id: biz-46
+  title: identity.create_user 500/500/500/500
+  category: retry
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: retry_exhausted
+    state_counts:
+      users: 0
+      mailboxes: 0
+      members: 0
+      tickets: 0
+    max_steps: 40
+  faults:
+  - operation: identity.create_user
+    sequence:
+    - '500'
+    - '500'
+    - '500'
+    - '500'
+- id: biz-47
+  title: identity.create_mailbox 500
+  category: retry
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+    max_steps: 40
+  faults:
+  - operation: identity.create_mailbox
+    sequence:
+    - '500'
+- id: biz-48
+  title: code.invite_member timeout_after_commit
+  category: retry
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+    max_steps: 40
+  faults:
+  - operation: code.invite_member
+    sequence:
+    - timeout_after_commit
+- id: biz-49
+  title: 1人 域策略失败停用账号
+  category: compensation
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: compensated
+    state_counts:
+      users: 0
+      mailboxes: 0
+      members: 0
+      tickets: 0
+      orders: 0
+      seats: 0
+      refunds: 0
+    balance_cents: 100000
+    compensations:
+    - p1_user
+  employees: 1
+  facts: {}
+  faults:
+  - operation: identity.create_mailbox
+    sequence:
+    - domain_policy
+- id: biz-50
+  title: 3人 域策略失败停用账号
+  category: compensation
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: partial_success
+    state_counts:
+      users: 2
+      mailboxes: 0
+      members: 0
+      tickets: 0
+      orders: 0
+      seats: 0
+      refunds: 0
+    balance_cents: 100000
+    compensations:
+    - p1_user
+  employees: 3
+  facts: {}
+  faults:
+  - operation: identity.create_mailbox
+    sequence:
+    - domain_policy
+- id: biz-51
+  title: 1人 余额不足撤销成员
+  category: compensation
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: partial_success
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 0
+      tickets: 0
+      orders: 0
+      seats: 0
+      refunds: 0
+    balance_cents: 100000
+    compensations:
+    - p1_invite
+  employees: 1
+  facts:
+    paid_item: developer_seat
+    unit_price_cents: 1200
+  faults:
+  - operation: money.create_order
+    sequence:
+    - insufficient_funds
+- id: biz-52
+  title: 2人 余额不足撤销成员
+  category: compensation
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: partial_success
+    state_counts:
+      users: 2
+      mailboxes: 2
+      members: 1
+      tickets: 0
+      orders: 0
+      seats: 0
+      refunds: 0
+    balance_cents: 100000
+    compensations:
+    - p1_invite
+  employees: 2
+  facts:
+    paid_item: developer_seat
+    unit_price_cents: 1200
+  faults:
+  - operation: money.create_order
+    sequence:
+    - insufficient_funds
+- id: biz-53
+  title: replay 1人 免费
+  category: replay
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+      orders: 0
+      seats: 0
+  employees: 1
+  facts: {}
+  replay: true
+- id: biz-54
+  title: replay 2人 免费
+  category: replay
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 2
+      mailboxes: 2
+      members: 2
+      tickets: 2
+      orders: 0
+      seats: 0
+  employees: 2
+  facts: {}
+  replay: true
+- id: biz-55
+  title: replay 3人 免费
+  category: replay
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 3
+      mailboxes: 3
+      members: 3
+      tickets: 3
+      orders: 0
+      seats: 0
+  employees: 3
+  facts: {}
+  replay: true
+- id: biz-56
+  title: replay 1人 付费
+  category: replay
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+      orders: 1
+      seats: 1
+  employees: 1
+  facts:
+    paid_item: developer_seat
+    unit_price_cents: 1200
+  replay: true
+- id: biz-57
+  title: restart 1人 免费
+  category: restart
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+      orders: 0
+      seats: 0
+  employees: 1
+  facts: {}
+  restart: true
+- id: biz-58
+  title: restart 2人 免费
+  category: restart
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 2
+      mailboxes: 2
+      members: 2
+      tickets: 2
+      orders: 0
+      seats: 0
+  employees: 2
+  facts: {}
+  restart: true
+- id: biz-59
+  title: restart 3人 免费
+  category: restart
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 3
+      mailboxes: 3
+      members: 3
+      tickets: 3
+      orders: 0
+      seats: 0
+  employees: 3
+  facts: {}
+  restart: true
+- id: biz-60
+  title: restart 1人 付费
+  category: restart
+  kind: task
+  text: 请为新员工办理入职，开通账号和邮箱。
+  expect:
+    final_state: succeeded
+    state_counts:
+      users: 1
+      mailboxes: 1
+      members: 1
+      tickets: 1
+      orders: 1
+      seats: 1
+  employees: 1
+  facts:
+    paid_item: developer_seat
+    unit_price_cents: 1200
+  restart: true

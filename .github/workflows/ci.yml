@@ -15,6 +15,22 @@ env:
   OPA_VERSION: "1.4.2"
 
 jobs:
+  approval-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: apps/web
+      - run: npm test
+        working-directory: apps/web
+      - run: npm run build
+        working-directory: apps/web
+
   # 1) 零外部依赖：lint + 单测。任何 PR 都必须先过这一关。
   lint-and-test:
     runs-on: ubuntu-latest
@@ -32,6 +48,8 @@ jobs:
         run: uv run ruff check .
       - name: 单元测试（不含 integration）
         run: uv run pytest -m "not integration" -q
+      - name: W5 规划与预演五场景自检
+        run: uv run python -m scripts.w5_plan_demo --check
 
   # 2) 检索评测：零外部依赖（本地 BM25 + 哈希向量）。改了切块/分词/融合/版本解析
   #    之后，这一步会立刻告诉你检索质量有没有退化。
@@ -65,7 +83,9 @@ jobs:
       - name: 护栏评测（拦截率 ≥95%，误拦 <5%）
         run: uv run python -m eval.run_guardrails_eval --json eval/guardrails_eval.json
       - name: 留出集报告（不设门禁，只记录泛化能力）
-        run: uv run python -m eval.run_guardrails_eval --cases data/guardrails/cases_holdout.yaml
+        run: uv run python -m eval.run_guardrails_eval --cases data/guardrails/cases_holdout.yaml --report-only
+      - name: 旧留出集回归（已参与调参）
+        run: uv run python -m eval.run_guardrails_eval --cases data/guardrails/cases_regression_v1.yaml
       - name: W4 演示脚本自检
         run: uv run python -m scripts.w4_guardrails_demo --check
 
@@ -116,3 +136,28 @@ jobs:
           uv run alembic upgrade head
       - name: 集成测试
         run: uv run pytest -m integration -q
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: ${{ env.OPA_VERSION }}
+      - name: W6 真实 HTTP 强杀与恢复
+        run: |
+          opa run --server --addr=127.0.0.1:8181 policies > "$RUNNER_TEMP/w6-opa.log" 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8181/health && break || sleep 1; done
+          uv run python -m scripts.w6_approval_demo --check
+      - name: W7 幂等执行、429 退避与提交后强杀恢复
+        run: uv run python -m scripts.w7_execution_demo --check
+      - name: W8 分组补偿、部分成功与退款提交后强杀恢复
+        run: uv run python -m scripts.w8_saga_demo --check
+      - name: W9 三类记忆、组织归属、重启与隔离
+        run: uv run python -m scripts.w9_memory_demo --check
+      - name: W10 追踪、只读回放、用量与强杀恢复
+        run: uv run python -m scripts.w10_observability_demo --check
+      - name: W11 600 次业务与对抗回归、版本基线门禁
+        run: uv run python -m eval.runner --concurrency 4 --output eval/results/w11-current.json
+      - name: 保存 W11 逐例结果与指标报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w11-evaluation
+          path: eval/results/w11-current.*
+          if-no-files-found: warn

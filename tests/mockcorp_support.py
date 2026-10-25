@@ -33,11 +33,16 @@ class MemoryStore:
             "next_after_id": items[-1]["id"] if len(rows) > limit else None,
         }
 
-    def transact(self, tenant, key, handler, *, operation="", actor=None):
+    def transact(self, tenant, key, handler, *, operation="", actor=None, source_key=None):
         with self.lock:
             state = self.snapshot(tenant)
             try:
-                outcome = handler(state, deepcopy(self.receipts.get((tenant, key))))
+                receipt = deepcopy(self.receipts.get((tenant, key)))
+                if source_key is not None:
+                    source = deepcopy(self.receipts.get((tenant, source_key)))
+                    outcome = handler(state, receipt, source["body"] if source else None)
+                else:
+                    outcome = handler(state, receipt)
             except Exception:
                 # 与 PostgresStore 保持一致：走生产代码的 Outcome 分类，不手写字面量
                 failure = Outcome(

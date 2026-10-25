@@ -1,0 +1,67 @@
+[
+  {
+    "run": "c4-r1",
+    "run_id": "ce441957148a41109b3e2e82cb742fde",
+    "passed": 600,
+    "connections": 30,
+    "p95": 1390.843,
+    "elapsed": 65.462,
+    "pool_sizes": {
+      "supplier": 4,
+      "approval": 4
+    },
+    "rechecked": true
+  },
+  {
+    "run": "c4-r2",
+    "run_id": "2b39316405a44b5298b2fd57e7de9d42",
+    "passed": 600,
+    "connections": 30,
+    "p95": 1363.843,
+    "elapsed": 63.846,
+    "pool_sizes": {
+      "supplier": 4,
+      "approval": 4
+    },
+    "rechecked": true
+  },
+  {
+    "run": "c4-r3",
+    "run_id": "a9d02f14d60741019fdc827e687f4261",
+    "passed": 600,
+    "connections": 30,
+    "p95": 1385.889,
+    "elapsed": 65.052,
+    "pool_sizes": {
+      "supplier": 4,
+      "approval": 4
+    },
+    "rechecked": true
+  },
+  {
+    "run": "c8-r1",
+    "run_id": "9105047c5a1e437cb992bf168cf7ce20",
+    "passed": 600,
+    "connections": 38,
+    "p95": 1985.918,
+    "elapsed": 44.9,
+    "pool_sizes": {
+      "supplier": 8,
+      "approval": 8
+    },
+    "rechecked": true
+  },
+  {
+    "run": "c8-r2",
+    "run_id": "6dd0e00b50bf46e6b869d42bf970d951",
+    "passed": 600,
+    "connections": 38,
+    "p95": 1872.277,
+    "elapsed": 44.096,
+    "pool_sizes": {
+      "supplier": 8,
+      "approval": 8
+    },
+    "rechecked": true
+  }
+]

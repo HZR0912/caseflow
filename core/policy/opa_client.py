@@ -17,6 +17,9 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
+from core.obs.privacy import label
+from core.obs.runtime import headers, span
+
 # 策略包路径：policies/authz.rego -> package caseflow.authz，对外契约是 decision 对象。
 # 只查 decision 而不是整个包：内部规则（角色映射表等）不进入调用方视野。
 DEFAULT_DECISION_PATH = "/v1/data/caseflow/authz/decision"
@@ -93,10 +96,21 @@ class PolicyClient:
         self._client = client or httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=timeout)
 
     async def authorize(self, query: PolicyQuery) -> PolicyDecision:
+        async with span("policy.authorize", {"action": label(query.action)}) as frame:
+            result = await self._authorize(query)
+            frame.output = {
+                "allow": result.allow,
+                "degraded": result.degraded,
+                "reason": label(result.reason),
+            }
+            frame.status = "ok" if result.allow else "error"
+            return result
+
+    async def _authorize(self, query: PolicyQuery) -> PolicyDecision:
         started = time.perf_counter()
         try:
             response = await self._client.post(
-                self._decision_path, json={"input": query.to_opa_input()}
+                self._decision_path, json={"input": query.to_opa_input()}, headers=headers()
             )
             response.raise_for_status()
         except httpx.HTTPError as exc:  # 超时、连接失败、4xx/5xx 全部落到这里

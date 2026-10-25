@@ -15,9 +15,9 @@ default allow := false
 
 # 角色 -> 允许的动作前缀集合。前缀即命名空间：identity.* / code.* / ticket.* / money.* / admin.*
 _role_action_prefixes := {
-	"admin": {"admin", "identity", "code", "ticket", "money"},
-	"team_lead": {"code", "ticket"},
-	"employee": {"ticket"},
+	"admin": {"admin", "identity", "code", "ticket", "money", "approval", "memory", "organization", "trace"},
+	"team_lead": {"code", "ticket", "memory"},
+	"employee": {"ticket", "memory"},
 	"intern": set(),
 }
 
@@ -33,6 +33,11 @@ _role_permits if {
 
 	# 每段必须是有效标识符：拒绝空动作、连续点和尾随点。
 	regex.match(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`, input.action)
+}
+
+_role_permits if {
+	input.user.role in {"team_lead", "employee"}
+	input.action in {"organization.read", "trace.read"}
 }
 
 allow if {

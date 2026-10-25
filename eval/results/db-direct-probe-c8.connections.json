@@ -1,0 +1,28 @@
+{
+  "counts": {
+    "sync_attempts": 4975,
+    "async_attempts": 569,
+    "sync_errors": 3
+  },
+  "failures": [
+    {
+      "kind": "sync_errors",
+      "type": "OperationalError",
+      "sqlstate": null,
+      "message": "connection failed: connection to server at \"[redacted]\", port [redacted] failed: Address already in use (0x00002740/10048)\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "kind": "sync_errors",
+      "type": "OperationalError",
+      "sqlstate": null,
+      "message": "connection failed: connection to server at \"[redacted]\", port [redacted] failed: Address already in use (0x00002740/10048)\n\tIs the server running on that host and accepting TCP/IP connections?"
+    },
+    {
+      "kind": "sync_errors",
+      "type": "OperationalError",
+      "sqlstate": null,
+      "message": "connection failed: connection to server at \"[redacted]\", port [redacted] failed: Address already in use (0x00002740/10048)\n\tIs the server running on that host and accepting TCP/IP connections?"
+    }
+  ],
+  "elapsed_s": 68.44786270000623
+}

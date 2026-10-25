@@ -73,6 +73,7 @@ class Store(Protocol):
         *,
         operation: str = "",
         actor: str | None = None,
+        source_key: str | None = None,
     ) -> Reply: ...
     def snapshot(self, tenant: str) -> dict: ...
     def oplog(self, tenant: str, after_id: int = 0, limit: int = 100) -> dict: ...
@@ -80,29 +81,36 @@ class Store(Protocol):
 
 
 class PostgresStore:
-    def __init__(self, database_url: str, settings: MockSettings):
+    def __init__(self, database_url: str, settings: MockSettings, *, pool=None):
         self.url = (
             make_url(database_url)
             .set(drivername="postgresql")
             .render_as_string(hide_password=False)
         )
         self.settings = settings
+        self.pool = pool
+
+    def _connect(self):
+        # The app/evaluation owns the pool. One-shot scripts may use a direct connection.
+        if self.pool is not None:
+            return self.pool.connection()
+        return psycopg.connect(self.url, connect_timeout=5)
 
     def health(self) -> None:
-        with psycopg.connect(self.url, connect_timeout=5) as conn:
+        with self._connect() as conn:
             conn.execute("SELECT 1 FROM mockcorp_state LIMIT 1")
             conn.execute("SELECT 1 FROM mockcorp_receipts LIMIT 1")
             conn.execute("SELECT 1 FROM mockcorp_oplog LIMIT 1")
 
     def snapshot(self, tenant: str) -> dict:
-        with psycopg.connect(self.url, connect_timeout=5) as conn:
+        with self._connect() as conn:
             row = conn.execute(
                 "SELECT state FROM mockcorp_state WHERE tenant = %s", (tenant,)
             ).fetchone()
             return row[0] if row else initial_state(self.settings)
 
     def oplog(self, tenant: str, after_id: int = 0, limit: int = 100) -> dict:
-        with psycopg.connect(self.url, connect_timeout=5) as conn:
+        with self._connect() as conn:
             rows = conn.execute(
                 "SELECT id, operation, actor, dry_run, replayed, status_code, outcome, "
                 "error_code, result_id, idempotency_key, created_at "
@@ -174,8 +182,9 @@ class PostgresStore:
         *,
         operation: str = "",
         actor: str | None = None,
+        source_key: str | None = None,
     ) -> Reply:
-        with psycopg.connect(self.url, connect_timeout=5) as conn:
+        with self._connect() as conn:
             # 即使租户首次出现，也由唯一键冲突等待和行锁保护并发初始化。
             conn.execute(
                 "INSERT INTO mockcorp_state (tenant, state) VALUES (%s, %s) ON CONFLICT DO NOTHING",
@@ -194,7 +203,14 @@ class PostgresStore:
                 if row:
                     receipt = {"fingerprint": row[0], "status": row[1], "body": row[2]}
             try:
-                outcome = handler(state, receipt)
+                if source_key is not None:
+                    source = conn.execute(
+                        "SELECT response FROM mockcorp_receipts WHERE tenant=%s AND key=%s",
+                        (tenant, source_key),
+                    ).fetchone()
+                    outcome = handler(state, receipt, source[0] if source else None)
+                else:
+                    outcome = handler(state, receipt)
             except Exception:
                 # 未预期异常：业务回滚，但留下一条 error 日志再抛出。
                 entry = Outcome(

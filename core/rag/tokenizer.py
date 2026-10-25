@@ -42,7 +42,8 @@ def tokenize(text: str) -> list[str]:
 
 def to_tsquery_text(tokens: list[str]) -> str:
     """把 token 列表转成 `tsvector` 可读的形态（空格分隔，simple 配置不词干化）。"""
-    return " ".join(dict.fromkeys(tokens))
+    # 文档词频参与 ts_rank；只有查询表达式可以去重。
+    return " ".join(tokens)
 
 
 def to_or_tsquery(tokens: list[str]) -> str:

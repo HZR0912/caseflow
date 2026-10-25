@@ -131,7 +131,7 @@ class PolicyStore:
                 f"""
                 SELECT chunk_id FROM {self.table}
                 WHERE embedding IS NOT NULL AND effective_date <= %s
-                ORDER BY embedding <=> %s::vector
+                ORDER BY embedding <=> %s::vector, chunk_id ASC
                 LIMIT %s
                 """,
                 (as_of, vector, recall),
@@ -150,7 +150,7 @@ class PolicyStore:
                 f"""
                 SELECT chunk_id FROM {self.table}
                 WHERE tsv @@ to_tsquery('simple', %s) AND effective_date <= %s
-                ORDER BY ts_rank(tsv, to_tsquery('simple', %s)) DESC
+                ORDER BY ts_rank(tsv, to_tsquery('simple', %s)) DESC, chunk_id ASC
                 LIMIT %s
                 """,
                 (query_text, as_of, query_text, recall),
@@ -168,22 +168,22 @@ class PolicyStore:
         include_superseded: bool = True,
     ) -> Ranked:
         as_of = as_of or date.today()
-        routes: list[list[str]] = []
-        for route in (self._vector_route, self._text_route):
+        routes: dict[str, list[str]] = {}
+        for name, route in (("vector", self._vector_route), ("text", self._text_route)):
             try:
                 found = route(query, recall, as_of)
             except Exception:
                 found = []
             if found:
-                routes.append(found)
+                routes[name] = found
         if not routes:
             return Ranked()
 
-        fused = rrf_fuse(routes)
+        fused = rrf_fuse(list(routes.values()))
         order = sorted(fused, key=lambda cid: (-fused[cid], cid))
         candidates = self._load(order, fused)
         ranked = resolve_versions(candidates, as_of=as_of, include_superseded=include_superseded)
-        ranked.routes = {f"route{i}": len(route) for i, route in enumerate(routes)}
+        ranked.routes = {name: len(route) for name, route in routes.items()}
         ranked.hits = ranked.hits[:top_k]
         ranked.superseded = align_superseded(ranked.hits, ranked.superseded)
         return ranked

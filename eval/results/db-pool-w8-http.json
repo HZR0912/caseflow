@@ -1,0 +1,856 @@
+{
+  "checked_at": "2026-10-25T08:21:45.615941+00:00",
+  "passed": 16,
+  "checks": [
+    "insufficient_funds_precise_membership_undo",
+    "identity_retained",
+    "terminal_replay_no_calls",
+    "reverse_unbind_refund_remove",
+    "kill_after_refund_before_local_receipt",
+    "restart_uses_same_compensation_key",
+    "exactly_one_refund_balance_restored",
+    "207_exact_item_results",
+    "partial_success_subset_restored",
+    "batch_failed_items_untouched",
+    "compensation_429_retry_after",
+    "compensation_response_loss_replayed",
+    "undo_retry_budget_exhausted_manual",
+    "unknown_undo_explicit",
+    "terminal_undo_budget_not_reset",
+    "supplier_no_duplicate_commits"
+  ],
+  "duplicate_commits": 0,
+  "evidence": {
+    "funds": {
+      "request_id": "26a94995-f771-58d9-b049-44958496c99a",
+      "plan_hash": "1c9529d235bbaf80362705a28c84afdb3b8b2299c32ba432c9e9378be1f6791e",
+      "status": "partial_success",
+      "steps": [
+        {
+          "step_id": "p1_user",
+          "operation": "identity.create_user",
+          "status": "succeeded",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:20:46.570630+00:00",
+              "actor": "requester",
+              "status": "succeeded",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:d54ee4a7023edc2167d79a60b517e7ec3b5f94328f98de86aca8b1a61c82274e",
+          "outcome_unknown": false,
+          "result": {
+            "id": "03c5e11ac30e43c7819a0b18d9d22bc0"
+          }
+        },
+        {
+          "step_id": "p1_mail",
+          "operation": "identity.create_mailbox",
+          "status": "succeeded",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:20:47.416275+00:00",
+              "actor": "requester",
+              "status": "succeeded",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:846117dc5130be3977fd0114496f45c9ab73b871e2f0b0e3a72ebd001c094661",
+          "outcome_unknown": false,
+          "result": {
+            "id": "2f135ba4675d46799d2f86993b510a92"
+          }
+        },
+        {
+          "step_id": "p1_invite",
+          "operation": "code.invite_member",
+          "status": "succeeded",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:20:48.246657+00:00",
+              "actor": "requester",
+              "status": "succeeded",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:8661ab5506416bd22031eddad8bba17e7d6c1e2f792ac26ddd077bba222589d9",
+          "outcome_unknown": false,
+          "result": {
+            "id": "31979408e52748f792b35233051a7e95"
+          }
+        },
+        {
+          "step_id": "p1_order",
+          "operation": "money.create_order",
+          "status": "compensation_required",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:20:49.081609+00:00",
+              "actor": "requester",
+              "status": "compensation_required",
+              "code": "insufficient_funds",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:8137fd2808bbb2e01abd58b96af41a6831800504ddaf84c4015a895d866cc725",
+          "outcome_unknown": false,
+          "code": "insufficient_funds"
+        },
+        {
+          "step_id": "p1_seat",
+          "operation": "money.bind_seat",
+          "status": "not_started",
+          "attempts": 0,
+          "events": []
+        },
+        {
+          "step_id": "p1_ticket",
+          "operation": "ticket.create_ticket",
+          "status": "not_started",
+          "attempts": 0,
+          "events": []
+        }
+      ],
+      "failed_step": "p1_order",
+      "completed_steps": [
+        "p1_user",
+        "p1_mail",
+        "p1_invite"
+      ],
+      "compensation_executed": true,
+      "summary": {
+        "completed": [
+          "p1_user",
+          "p1_mail",
+          "p1_invite"
+        ],
+        "retained": [
+          "p1_user",
+          "p1_mail"
+        ],
+        "compensated": [
+          "p1_invite"
+        ],
+        "failed": [
+          "p1_order"
+        ],
+        "not_started": [
+          "p1_seat",
+          "p1_ticket"
+        ],
+        "unknown": [],
+        "compensation_unknown": [],
+        "manual": []
+      },
+      "forward_status": "compensation_required",
+      "saga": {
+        "version": 1,
+        "group": "p1_access",
+        "status": "completed",
+        "steps": [
+          {
+            "step_id": "p1_invite",
+            "operation": "code.invite_member",
+            "source_key": "cf7:8661ab5506416bd22031eddad8bba17e7d6c1e2f792ac26ddd077bba222589d9",
+            "key": "undo:c4bb887c69cbcba97d43ab3f6096ecc2484010f981dc942ce787b3f451591994",
+            "status": "succeeded",
+            "code": null,
+            "attempts": 1,
+            "events": [
+              {
+                "attempt": 1,
+                "actor": "requester",
+                "started_at": "2026-10-25T08:20:49.911150+00:00",
+                "status": "succeeded",
+                "code": "",
+                "replayed": false
+              }
+            ],
+            "outcome_unknown": false
+          }
+        ]
+      }
+    },
+    "refund_crash": {
+      "old_pid": 179936,
+      "new_pid": 26852,
+      "execution": {
+        "saga": {
+          "group": "p1_access",
+          "steps": [
+            {
+              "key": "undo:43a778858d78c11bbcc7970375e00ffb9ad438e6b67f55c15a05de2302cc41f9",
+              "code": null,
+              "events": [
+                {
+                  "code": "",
+                  "actor": "requester",
+                  "status": "succeeded",
+                  "attempt": 1,
+                  "replayed": false,
+                  "started_at": "2026-10-25T08:21:06.982208+00:00"
+                }
+              ],
+              "status": "succeeded",
+              "step_id": "p1_seat",
+              "attempts": 1,
+              "operation": "money.bind_seat",
+              "source_key": "cf7:3d5bdfd81bb7edccc8d416b9b252c280750c5310bfb7f82f9cdb0073a770d3ae",
+              "outcome_unknown": false
+            },
+            {
+              "key": "undo:ba7c0214e8a38516f5acc5b8f58c299b0dca36c5c0c960a5ecd4ead9e007b749",
+              "code": null,
+              "events": [
+                {
+                  "actor": "requester",
+                  "status": "started",
+                  "attempt": 1,
+                  "started_at": "2026-10-25T08:21:07.899829+00:00"
+                },
+                {
+                  "attempt": 2,
+                  "actor": "requester",
+                  "started_at": "2026-10-25T08:21:13.376070+00:00",
+                  "status": "succeeded",
+                  "code": "",
+                  "replayed": true
+                }
+              ],
+              "status": "succeeded",
+              "step_id": "p1_order",
+              "attempts": 2,
+              "operation": "money.create_order",
+              "source_key": "cf7:915eacfdf6c6f163a117ea298166a1f7cbe48434f7fab525fee40098d6d0788d",
+              "outcome_unknown": false
+            },
+            {
+              "key": "undo:a0bfd1b358186e26abe10a305bf1b2868d08782613eb49caddbf889afaca0946",
+              "code": null,
+              "events": [
+                {
+                  "attempt": 1,
+                  "actor": "requester",
+                  "started_at": "2026-10-25T08:21:14.195893+00:00",
+                  "status": "succeeded",
+                  "code": "",
+                  "replayed": false
+                }
+              ],
+              "status": "succeeded",
+              "step_id": "p1_invite",
+              "attempts": 1,
+              "operation": "code.invite_member",
+              "source_key": "cf7:f81978c59d4df81af3467b9f0aee2196cefdecea87607d2f21d44979855dba61",
+              "outcome_unknown": false
+            }
+          ],
+          "status": "completed",
+          "version": 1
+        },
+        "steps": [
+          {
+            "key": "cf7:4754a75740abbdb4e3025cc2254b6932abb3d91b318918da25b738521a4eb0c0",
+            "events": [
+              {
+                "code": "",
+                "actor": "requester",
+                "status": "succeeded",
+                "attempt": 1,
+                "replayed": false,
+                "started_at": "2026-10-25T08:20:55.497611+00:00"
+              }
+            ],
+            "result": {
+              "id": "ebaef84765404387bc5b1027d2c75703"
+            },
+            "status": "succeeded",
+            "step_id": "p1_user",
+            "attempts": 1,
+            "operation": "identity.create_user",
+            "outcome_unknown": false
+          },
+          {
+            "key": "cf7:881ec98b78a04555229ab876c5637cf9f811326d47e7c8e9385aee6dda0228ea",
+            "events": [
+              {
+                "code": "",
+                "actor": "requester",
+                "status": "succeeded",
+                "attempt": 1,
+                "replayed": false,
+                "started_at": "2026-10-25T08:20:56.423186+00:00"
+              }
+            ],
+            "result": {
+              "id": "0637d55e39f7478dab7132c26858acd7"
+            },
+            "status": "succeeded",
+            "step_id": "p1_mail",
+            "attempts": 1,
+            "operation": "identity.create_mailbox",
+            "outcome_unknown": false
+          },
+          {
+            "key": "cf7:f81978c59d4df81af3467b9f0aee2196cefdecea87607d2f21d44979855dba61",
+            "events": [
+              {
+                "code": "",
+                "actor": "requester",
+                "status": "succeeded",
+                "attempt": 1,
+                "replayed": false,
+                "started_at": "2026-10-25T08:20:57.269674+00:00"
+              }
+            ],
+            "result": {
+              "id": "7af9ea563f9243d0905885d27d20efd0"
+            },
+            "status": "succeeded",
+            "step_id": "p1_invite",
+            "attempts": 1,
+            "operation": "code.invite_member",
+            "outcome_unknown": false
+          },
+          {
+            "key": "cf7:915eacfdf6c6f163a117ea298166a1f7cbe48434f7fab525fee40098d6d0788d",
+            "events": [
+              {
+                "code": "",
+                "actor": "requester",
+                "status": "succeeded",
+                "attempt": 1,
+                "replayed": false,
+                "started_at": "2026-10-25T08:20:58.153991+00:00"
+              }
+            ],
+            "result": {
+              "id": "64b7765c49b147ce99ad4aefc76ed0b7"
+            },
+            "status": "succeeded",
+            "step_id": "p1_order",
+            "attempts": 1,
+            "operation": "money.create_order",
+            "outcome_unknown": false
+          },
+          {
+            "key": "cf7:3d5bdfd81bb7edccc8d416b9b252c280750c5310bfb7f82f9cdb0073a770d3ae",
+            "events": [
+              {
+                "code": "",
+                "actor": "requester",
+                "status": "succeeded",
+                "attempt": 1,
+                "replayed": false,
+                "started_at": "2026-10-25T08:20:58.972561+00:00"
+              }
+            ],
+            "result": {
+              "id": "89af0f0d5f2a461496ff3fe6c5185162"
+            },
+            "status": "succeeded",
+            "step_id": "p1_seat",
+            "attempts": 1,
+            "operation": "money.bind_seat",
+            "outcome_unknown": false
+          },
+          {
+            "key": "cf7:fe96734efbe990eebdb1d3d290432d27bc8bee915cb26351aa055912107f14da",
+            "code": "http_429",
+            "events": [
+              {
+                "code": "http_429",
+                "actor": "requester",
+                "status": "retryable",
+                "attempt": 1,
+                "replayed": false,
+                "started_at": "2026-10-25T08:20:59.801910+00:00",
+                "delay_seconds": 1.0
+              },
+              {
+                "code": "http_429",
+                "actor": "requester",
+                "status": "retryable",
+                "attempt": 2,
+                "replayed": false,
+                "started_at": "2026-10-25T08:21:01.642787+00:00",
+                "delay_seconds": 1.0
+              },
+              {
+                "code": "http_429",
+                "actor": "requester",
+                "status": "retryable",
+                "attempt": 3,
+                "replayed": false,
+                "started_at": "2026-10-25T08:21:03.486939+00:00",
+                "delay_seconds": 1.7662625826488858
+              },
+              {
+                "code": "http_429",
+                "actor": "requester",
+                "status": "retryable",
+                "attempt": 4,
+                "replayed": false,
+                "started_at": "2026-10-25T08:21:06.103822+00:00"
+              }
+            ],
+            "status": "retry_exhausted",
+            "step_id": "p1_ticket",
+            "attempts": 4,
+            "operation": "ticket.create_ticket",
+            "outcome_unknown": false
+          }
+        ],
+        "status": "partial_success",
+        "summary": {
+          "completed": [
+            "p1_user",
+            "p1_mail",
+            "p1_invite",
+            "p1_order",
+            "p1_seat"
+          ],
+          "retained": [
+            "p1_user",
+            "p1_mail"
+          ],
+          "compensated": [
+            "p1_invite",
+            "p1_order",
+            "p1_seat"
+          ],
+          "failed": [
+            "p1_ticket"
+          ],
+          "not_started": [],
+          "unknown": [],
+          "compensation_unknown": [],
+          "manual": []
+        },
+        "plan_hash": "7e84bac73d8b703dfa2e616937a2f2eecc9c4bdd23deca9f1eb5316bdd1f4d25",
+        "request_id": "6d32c874-931f-55c7-a4f8-6c9bf365f8d1",
+        "failed_step": "p1_ticket",
+        "forward_status": "retry_exhausted",
+        "completed_steps": [
+          "p1_user",
+          "p1_mail",
+          "p1_invite",
+          "p1_order",
+          "p1_seat"
+        ],
+        "compensation_executed": true
+      }
+    },
+    "batch": {
+      "request_id": "4cbdc7f4-1cc6-5d99-aa91-551d92dc2ff4",
+      "plan_hash": "f34affe4c8374a34f812137b005158d14daf49a7943d656bef11aecab374ebd8",
+      "status": "partial_success",
+      "steps": [
+        {
+          "step_id": "p1_user",
+          "operation": "identity.create_user",
+          "status": "succeeded",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:21:22.320500+00:00",
+              "actor": "requester",
+              "status": "succeeded",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:50db35387d5bf0ad4a2c57e5f4d79632447648325d62c087b9ced8ed2c31f90e",
+          "outcome_unknown": false,
+          "result": {
+            "id": "2a36aab6bd12453c8418919aecc5335e"
+          }
+        },
+        {
+          "step_id": "p1_mail",
+          "operation": "identity.create_mailbox",
+          "status": "succeeded",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:21:23.188538+00:00",
+              "actor": "requester",
+              "status": "succeeded",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:79726631df96473adfd3d0ce17ddc4e9bc310c71b7cf24f69adc2e4911b01b43",
+          "outcome_unknown": false,
+          "result": {
+            "id": "1f4e1df5d00245fa8c207b7895c4e821"
+          }
+        },
+        {
+          "step_id": "p1_invite",
+          "operation": "code.invite_member",
+          "status": "succeeded",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:21:24.003406+00:00",
+              "actor": "requester",
+              "status": "succeeded",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:823889931652bc6d9693fba9569d2eb8e2e702d9ab753fda51621d7a35c3e3a5",
+          "outcome_unknown": false,
+          "result": {
+            "id": "76f1cd2c3bb84fe7aa02e211701a05f7"
+          }
+        },
+        {
+          "step_id": "p1_ticket",
+          "operation": "ticket.create_ticket",
+          "status": "succeeded",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:21:24.833546+00:00",
+              "actor": "requester",
+              "status": "succeeded",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:d015cf3ab6534fea95b08ad05ebd4271924ad446894b03cdc40436648466b792",
+          "outcome_unknown": false,
+          "result": {
+            "id": "3931c8f8169b49c7bf5bcd66057e8874"
+          }
+        },
+        {
+          "step_id": "assign_tickets",
+          "operation": "ticket.assign_tickets",
+          "status": "partial_success",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:21:25.666327+00:00",
+              "actor": "requester",
+              "status": "partial_success",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:9cb9b6c470dd960e8740d19785fdc676abacac0cab8b7cb791e85e3b4093a45a",
+          "outcome_unknown": false,
+          "items": [
+            {
+              "id": "51f393dfa1eb488d827c056352cd277e",
+              "status": "assigned"
+            },
+            {
+              "id": "2997ffa256264c7facbee3771e3779d8",
+              "status": "assigned"
+            },
+            {
+              "id": "e791e03a8a32410283eea43b266f8ae2",
+              "status": "failed"
+            },
+            {
+              "id": "68ea3e1a3247412789b2491d3323751f",
+              "status": "failed"
+            }
+          ],
+          "code": "batch_partial_failure"
+        }
+      ],
+      "failed_step": "assign_tickets",
+      "completed_steps": [
+        "p1_user",
+        "p1_mail",
+        "p1_invite",
+        "p1_ticket"
+      ],
+      "compensation_executed": true,
+      "summary": {
+        "completed": [
+          "p1_user",
+          "p1_mail",
+          "p1_invite",
+          "p1_ticket",
+          "assign_tickets"
+        ],
+        "retained": [
+          "p1_user",
+          "p1_mail",
+          "p1_invite",
+          "p1_ticket"
+        ],
+        "compensated": [
+          "assign_tickets"
+        ],
+        "failed": [
+          "assign_tickets"
+        ],
+        "not_started": [],
+        "unknown": [],
+        "compensation_unknown": [],
+        "manual": []
+      },
+      "forward_status": "partial_success",
+      "saga": {
+        "version": 1,
+        "group": "ticket_assignment",
+        "status": "completed",
+        "steps": [
+          {
+            "step_id": "assign_tickets",
+            "operation": "ticket.assign_tickets",
+            "source_key": "cf7:9cb9b6c470dd960e8740d19785fdc676abacac0cab8b7cb791e85e3b4093a45a",
+            "key": "undo:697897bbc4c83dcde6c5c192554b2b098aa0adcb5d8cd264db2b7501750bc9ad",
+            "status": "succeeded",
+            "code": null,
+            "attempts": 3,
+            "events": [
+              {
+                "attempt": 1,
+                "actor": "requester",
+                "started_at": "2026-10-25T08:21:26.580128+00:00",
+                "status": "retryable",
+                "code": "http_429",
+                "replayed": false,
+                "delay_seconds": 1.0
+              },
+              {
+                "attempt": 2,
+                "actor": "requester",
+                "started_at": "2026-10-25T08:21:28.431795+00:00",
+                "status": "retryable",
+                "code": "http_504",
+                "replayed": false,
+                "delay_seconds": 0.8574314668931323
+              },
+              {
+                "attempt": 3,
+                "actor": "requester",
+                "started_at": "2026-10-25T08:21:30.150289+00:00",
+                "status": "succeeded",
+                "code": "",
+                "replayed": true
+              }
+            ],
+            "outcome_unknown": false
+          }
+        ]
+      }
+    },
+    "manual": {
+      "request_id": "d80597c1-d0e3-5615-9ac6-bfa5f7c5187f",
+      "plan_hash": "4b985a31c6b0226943f3e266533d259170af456a89b29b43006a5c04dee7b98b",
+      "status": "compensation_failed",
+      "steps": [
+        {
+          "step_id": "p1_user",
+          "operation": "identity.create_user",
+          "status": "succeeded",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:21:35.627890+00:00",
+              "actor": "requester",
+              "status": "succeeded",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:51af35a8cada74b884d1fd8d1432ac5f793ec4bf8490fe31b322f9cca5493bf3",
+          "outcome_unknown": false,
+          "result": {
+            "id": "c755e98586894acba558072427a55763"
+          }
+        },
+        {
+          "step_id": "p1_mail",
+          "operation": "identity.create_mailbox",
+          "status": "succeeded",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:21:36.451827+00:00",
+              "actor": "requester",
+              "status": "succeeded",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:8375c58316403da54903d0607b2678076bab55dce3898abc4aa2be8901015325",
+          "outcome_unknown": false,
+          "result": {
+            "id": "f96958f5f03946ceb234b6e6957756a1"
+          }
+        },
+        {
+          "step_id": "p1_invite",
+          "operation": "code.invite_member",
+          "status": "succeeded",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:21:37.236850+00:00",
+              "actor": "requester",
+              "status": "succeeded",
+              "code": "",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:53e34de185c82a8be7e59c8f3808cbd940cfa73a6ccd63e31a234fa0847542ae",
+          "outcome_unknown": false,
+          "result": {
+            "id": "f2228c46b1aa4995a72a3bc19f7ddfe8"
+          }
+        },
+        {
+          "step_id": "p1_order",
+          "operation": "money.create_order",
+          "status": "compensation_required",
+          "attempts": 1,
+          "events": [
+            {
+              "attempt": 1,
+              "started_at": "2026-10-25T08:21:38.079376+00:00",
+              "actor": "requester",
+              "status": "compensation_required",
+              "code": "insufficient_funds",
+              "replayed": false
+            }
+          ],
+          "key": "cf7:4fbc6ce60b73afa41cd6e5c3981b9ea97a7cd8f8d868951f9f8b70b4f1649250",
+          "outcome_unknown": false,
+          "code": "insufficient_funds"
+        },
+        {
+          "step_id": "p1_seat",
+          "operation": "money.bind_seat",
+          "status": "not_started",
+          "attempts": 0,
+          "events": []
+        },
+        {
+          "step_id": "p1_ticket",
+          "operation": "ticket.create_ticket",
+          "status": "not_started",
+          "attempts": 0,
+          "events": []
+        }
+      ],
+      "failed_step": "p1_order",
+      "completed_steps": [
+        "p1_user",
+        "p1_mail",
+        "p1_invite"
+      ],
+      "compensation_executed": true,
+      "summary": {
+        "completed": [
+          "p1_user",
+          "p1_mail",
+          "p1_invite"
+        ],
+        "retained": [
+          "p1_user",
+          "p1_mail",
+          "p1_invite"
+        ],
+        "compensated": [],
+        "failed": [
+          "p1_order"
+        ],
+        "not_started": [
+          "p1_seat",
+          "p1_ticket"
+        ],
+        "unknown": [],
+        "compensation_unknown": [
+          "p1_invite"
+        ],
+        "manual": [
+          "p1_invite"
+        ]
+      },
+      "forward_status": "compensation_required",
+      "saga": {
+        "version": 1,
+        "group": "p1_access",
+        "status": "compensation_failed",
+        "steps": [
+          {
+            "step_id": "p1_invite",
+            "operation": "code.invite_member",
+            "source_key": "cf7:53e34de185c82a8be7e59c8f3808cbd940cfa73a6ccd63e31a234fa0847542ae",
+            "key": "undo:454911b5cf1e8dc548435e0e60c0eea16c9b916051b82d4237890bf10afaa50b",
+            "status": "failed",
+            "code": "compensation_retry_exhausted",
+            "attempts": 4,
+            "events": [
+              {
+                "attempt": 1,
+                "actor": "requester",
+                "started_at": "2026-10-25T08:21:38.907720+00:00",
+                "status": "retryable",
+                "code": "http_500",
+                "replayed": false,
+                "delay_seconds": 0.37531476708494693
+              },
+              {
+                "attempt": 2,
+                "actor": "requester",
+                "started_at": "2026-10-25T08:21:40.093516+00:00",
+                "status": "retryable",
+                "code": "http_500",
+                "replayed": false,
+                "delay_seconds": 0.9876940077343628
+              },
+              {
+                "attempt": 3,
+                "actor": "requester",
+                "started_at": "2026-10-25T08:21:41.980115+00:00",
+                "status": "retryable",
+                "code": "http_500",
+                "replayed": false,
+                "delay_seconds": 1.9059837315593637
+              },
+              {
+                "attempt": 4,
+                "actor": "requester",
+                "started_at": "2026-10-25T08:21:44.731650+00:00",
+                "status": "retryable",
+                "code": "http_500",
+                "replayed": false
+              }
+            ],
+            "outcome_unknown": true
+          }
+        ]
+      }
+    }
+  }
+}

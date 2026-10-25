@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from uuid import uuid4
@@ -106,7 +107,8 @@ def test_text_route_works_without_embeddings():
         assert nulls == len(chunks), "ingest(embed=False) 必须真的把向量清空"
 
         ranked = policy_store.search("生产环境权限最长多少天", top_k=5, as_of=AS_OF)
-        assert "route0" not in ranked.routes, "没有向量时不应出现向量路"
+        assert "vector" not in ranked.routes, "没有向量时不应出现向量路"
+        assert ranked.routes.get("text", 0) > 0
         assert "access-control@2026.1#006" in [hit.chunk_id for hit in ranked.hits]
     finally:
         _drop(url, table)
@@ -141,7 +143,7 @@ def test_text_route_returns_hits_for_every_eval_case():
 def test_vector_route_uses_pgvector_cosine(store):
     policy_store, _ = store
     ranked = policy_store.search("实习生账号有效期", top_k=5, as_of=AS_OF)
-    assert ranked.routes.get("route0", 0) > 0, "向量路应当返回候选"
+    assert ranked.routes.get("vector", 0) > 0, "向量路应当返回候选"
 
 
 def test_version_resolution_holds_in_sql(store):
@@ -165,3 +167,43 @@ def test_context_block_is_numbered_consistently(store):
     context = ranked.as_context()
     for index in range(1, len(ranked.hits) + 1):
         assert f"[{index}]" in context
+
+
+def test_recall_limit_breaks_equal_scores_by_chunk_id():
+    """相同文本/向量逆序入库，在 LIMIT 截断前必须有确定的次序。"""
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        pytest.skip("DATABASE_URL required for real PostgreSQL integration")
+    table = _fresh_table(url)
+    try:
+        policy_store = PolicyStore(url, HashingEmbedder(), table=table)
+        chunks, _ = load_corpus(POLICIES)
+        fixtures = [
+            replace(chunks[0], chunk_id=f"tie-{suffix}", text="needle")
+            for suffix in ("c", "b", "a")
+        ]
+        policy_store.ingest(fixtures)
+        assert policy_store._text_route("needle", 2, AS_OF) == ["tie-a", "tie-b"]
+        assert policy_store._vector_route("needle", 2, AS_OF) == ["tie-a", "tie-b"]
+    finally:
+        _drop(url, table)
+
+
+def test_document_term_frequency_affects_postgres_ranking():
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        pytest.skip("DATABASE_URL required for real PostgreSQL integration")
+    table = _fresh_table(url)
+    try:
+        policy_store = PolicyStore(url, None, table=table)
+        chunks, _ = load_corpus(POLICIES)
+        policy_store.ingest(
+            [
+                replace(chunks[0], chunk_id="a-once", text="needle"),
+                replace(chunks[0], chunk_id="z-repeated", text="needle needle needle"),
+            ],
+            embed=False,
+        )
+        assert policy_store._text_route("needle", 2, AS_OF) == ["z-repeated", "a-once"]
+    finally:
+        _drop(url, table)

@@ -1,5 +1,12 @@
 # 主服务镜像（compose 里 profile: app 才会用到）
 # 依赖 uv.lock 做可复现安装：镜像里的版本必须和本地一致
+FROM node:22-slim AS web-build
+WORKDIR /web
+COPY apps/web/package.json apps/web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY apps/web ./
+RUN npm run build
+
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -17,9 +24,11 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY alembic.ini ./
 COPY apps ./apps
+COPY --from=web-build /web/dist ./apps/web/dist
 COPY core ./core
 COPY migrations ./migrations
 COPY policies ./policies
+COPY data/policies ./data/policies
 COPY scripts ./scripts
 
 # 非 root 运行

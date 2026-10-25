@@ -2,7 +2,23 @@
 
 独立 FastAPI 服务，模拟 Identity、Code、Ticket、Money 四个企业系统，共 13 个写操作。
 这是 CaseFlow 后续 MCP 和执行器的 HTTP 对接目标。W2 实现供应方的事务与幂等；
-Agent 的 OPA 校验、审批、自动重试和 Saga 编排尚未接入此服务。
+W5 主 API 已在调用批量预演前检查 OPA；审批、自动重试和 Saga 编排尚未接入。
+
+## W5 批量预演
+
+`POST /v1/preview` 接收 `core/graph/contracts.py` 的 Plan，要求 Bearer 身份，
+最多 40 步，只允许创建账号/邮箱、邀请仓库成员、创建工单。依赖必须存在且无环，
+结果引用形如 `{"step":"p1_user","field":"id"}`，对应步骤必须声明在 depends_on。
+这是专用预演接口，没有执行开关，不需要幂等键，不适用下文单操作的 fault 参数。
+
+响应为 `{dry_run:true, ok:boolean, steps:[...]}`。每步为 ok（result/diff）、
+conflict（code）或 skipped（dependency_failed）。业务冲突仍返回 HTTP 200，
+调用方必须读 ok/status；非法 Plan 返回 422。依赖在同一事务私有状态中推进，最终
+丢弃所有业务变更和收据，只提交一条 operation=plan.preview、dry_run=true、outcome=dry_run
+的操作日志。日志的 dry_run 表示预演尝试，不表示所有步骤均成功。
+
+此内部模拟接口不重复调用 OPA；外部调用者应走主 API `/v1/plans/preview`。
+完整操作示例见 [W5 规划与预演](w5-planning.md)。
 
 ## 启动（PowerShell）
 
@@ -172,3 +188,23 @@ uv run pytest -m integration -q
 
 集成测试包含并发同 key 单次扣款、不同 key 防透支、事务回滚、部分成功持久化，
 以及真实 HTTP 超时后强杀/重启服务再重放；迁移往返在临时数据库及 CI 验证。
+
+## W8 收据绑定补偿
+
+POST /v1/compensations 的 JSON 体仅包含 operation（原正向操作）和 source_key
+（原幂等键），请求头 Idempotency-Key 必须等于 undo: + SHA256(source_key)。
+租户由 Bearer 映射，不接受客户端传入对象快照或退款金额。
+支持原操作：identity.create_user、identity.create_mailbox、code.invite_member、
+money.create_order、money.bind_seat、ticket.assign_tickets。
+
+成功返回 operation=saga.compensate、dry_run、result.id、diff；
+同键重放返回 Idempotency-Replayed: true，不再产生业务副作用。
+先核对原收据和所有目标对象的当前状态，再在同一事务补偿。
+状态变化返回 409 compensation_state_changed，外部依赖返回
+409 compensation_dependency_in_use，原租户/操作不匹配返回
+409 compensation_source_mismatch。已执行的补偿再 dry-run 返回
+409 compensation_already_applied。失败不写成功收据，保留尝试日志。
+
+故障模式支持 429、500、timeout_after_commit，需显式启用故障注入。
+补偿方法本身受 MockCorp 模拟租户凭据授权；Agent 端负责每次向 OPA 检查撤销动作。
+完整语义与演示见 [W8](w8-saga.md)。

@@ -1,0 +1,8 @@
+{
+  "counts": {
+    "sync_attempts": 10,
+    "async_attempts": 28
+  },
+  "failures": [],
+  "elapsed_s": 44.90038679999998
+}

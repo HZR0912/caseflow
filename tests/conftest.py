@@ -7,13 +7,18 @@ test_mockcorp_integration.py 用真实 PostgreSQL 验证。
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import os
+import sys
 from uuid import uuid4
 
 import pytest
+import pytest_asyncio
 from apps.api.settings import Settings, get_settings
 from apps.mockcorp.main import create_app
 from apps.mockcorp.models import MockSettings
+from core.db.pools import approval_pool, supplier_pool
 from fastapi.testclient import TestClient
 
 from tests.mockcorp_support import MemoryStore
@@ -21,6 +26,30 @@ from tests.mockcorp_support import MemoryStore
 TOKEN = "unit-test-only-token"
 OTHER_TOKEN = "unit-test-other-tenant"
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
+
+
+@pytest.fixture
+def supplier_connections():
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        pytest.skip("DATABASE_URL required")
+    with supplier_pool(url) as pool:
+        yield pool
+
+
+@pytest_asyncio.fixture
+async def approval_connections():
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        pytest.skip("DATABASE_URL required")
+    async with approval_pool(url) as pool:
+        yield pool
+
+
+def pytest_asyncio_loop_factories(config, item):
+    # psycopg async requires SelectorEventLoop on Windows.
+    factory = asyncio.SelectorEventLoop if sys.platform == "win32" else asyncio.new_event_loop
+    return {"platform": factory}
 
 
 @pytest.fixture

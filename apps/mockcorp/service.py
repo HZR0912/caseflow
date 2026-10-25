@@ -4,6 +4,9 @@ import hashlib
 import json
 import time
 
+from core.tools.compensation import compensation_key
+
+from apps.mockcorp.compensation import compensate
 from apps.mockcorp.domain import BusinessError, apply
 from apps.mockcorp.models import MockSettings
 from apps.mockcorp.store import LogEntry, Outcome, Reply, Store
@@ -45,6 +48,65 @@ class MockCorp:
     def __init__(self, store: Store, settings: MockSettings):
         self.store = store
         self.settings = settings
+
+    def compensate(
+        self, tenant, source_key, operation, *, key, actor=None, fault=None, dry_run=False
+    ):
+        if key != compensation_key(source_key):
+            return error_reply(409, "compensation_key_mismatch")
+        fingerprint = hashlib.sha256(json.dumps([source_key, operation]).encode()).hexdigest()
+        lost_response = False
+
+        def handle(state, receipt, source):
+            nonlocal lost_response
+            if receipt:
+                if receipt["fingerprint"] != fingerprint:
+                    return Outcome(error_reply(409, "idempotency_key_conflict"))
+                if dry_run:
+                    return Outcome(error_reply(409, "compensation_already_applied"))
+                return Outcome(
+                    Reply(receipt["status"], receipt["body"], {"Idempotency-Replayed": "true"}),
+                    log=LogEntry(replayed=True),
+                )
+            try:
+                if fault:
+                    if not self.settings.faults_enabled:
+                        raise BusinessError(403, "fault_injection_disabled")
+                    if fault not in {"429", "500", "timeout_after_commit"}:
+                        raise BusinessError(422, "unsupported_fault")
+                    if fault in {"429", "500"}:
+                        raise BusinessError(int(fault), "injected_" + fault, retryable=True)
+                    if dry_run:
+                        raise BusinessError(422, "fault_requires_commit")
+                result, diff = compensate(state, source, operation)
+                lost_response = fault == "timeout_after_commit"
+                return Outcome(
+                    Reply(
+                        200,
+                        {
+                            "operation": "saga.compensate",
+                            "dry_run": dry_run,
+                            "result": {"id": result["id"]},
+                            "diff": diff,
+                        },
+                    ),
+                    persist=not dry_run,
+                    fingerprint=fingerprint,
+                    log=LogEntry(dry_run=dry_run, result_id=result["id"]),
+                )
+            except BusinessError as exc:
+                return Outcome(
+                    error_reply(exc.status, exc.code, retryable=exc.retryable),
+                    log=LogEntry(error_code=exc.code, dry_run=dry_run),
+                )
+
+        reply = self.store.transact(
+            tenant, key, handle, source_key=source_key, operation="saga.compensate", actor=actor
+        )
+        if lost_response:
+            time.sleep(self.settings.fault_delay_s)
+            return error_reply(504, "injected_timeout_after_commit", retryable=True)
+        return reply
 
     def execute(
         self,

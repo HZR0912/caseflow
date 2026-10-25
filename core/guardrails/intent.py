@@ -7,11 +7,8 @@
     0.35 ≤ confidence < 0.55             → clarify（先问一句"你是想…还是想…？"）
     confidence < 0.35                    → human（转人工，不进模型）
 
-评分是关键词/短语加权：命中权重和 / 总权重。这个分母选择有讲究——
-用"总权重"而不是"命中权重和"做分母，会让多说几句无关话就稀释置信度；
-用"命中数/关键词数"又会让长句里一句话命中两次反而更可信。当前实现是
-`命中权重 / 该意图全部关键词权重`，等价于覆盖率，对"说全了"奖励，
-对"沾边"惩罚。阈值 0.55 / 0.35 是用 60 条对抗集 + 30 条正常集调出来的，
+评分是关键词/短语加权：命中权重和 / 饱和分母 K，上限为 1。
+阈值 0.55 / 0.35 是用 60 条对抗集 + 30 条正常集调出来的，
 不是拍脑袋——改了关键词必须重跑 `python -m eval.run_guardrails_eval`。
 
 已知弱点（要能在面试里主动说）：
@@ -66,6 +63,7 @@ INTENTS: tuple[IntentSpec, ...] = (
             "到岗": 1.0,
             "开通账号": 1.5,
             "开账号": 1.5,
+            "开个账号": 1.5,
             "建账号": 1.3,
             "开邮箱": 1.5,
             "开个邮箱": 1.5,
@@ -74,13 +72,13 @@ INTENTS: tuple[IntentSpec, ...] = (
             "准备环境": 1.2,
             "环境准备好": 1.0,
             "办入职": 1.5,
+            "办一下入职": 1.5,
             "入职手续": 1.3,
             "账号": 0.6,
             "邮箱": 0.8,
             "环境": 0.6,
         },
         required_any=("入职", "实习生", "新人", "报到", "到岗", "账号", "邮箱", "环境"),
-        risk=("batch_change",),
     ),
     IntentSpec(
         "offboard_employee",
@@ -110,6 +108,7 @@ INTENTS: tuple[IntentSpec, ...] = (
             "权限": 1.0,
             "申请权限": 1.5,
             "开通权限": 1.5,
+            "开个权限": 1.5,
             "加权限": 1.2,
             "生产库": 1.2,
             "生产环境": 1.2,
@@ -122,7 +121,6 @@ INTENTS: tuple[IntentSpec, ...] = (
             "授权": 1.0,
         },
         required_any=("权限",),
-        risk=("grant_admin",),
     ),
     IntentSpec(
         "purchase_software",
@@ -429,7 +427,7 @@ class RuleIntentClassifier:
             alternatives=[
                 (spec.name, value) for spec, value, _ in scored[1:4] if spec.name != best.name
             ][:3],
-            risk=list(best.risk),
+            risk=list(dict.fromkeys([*best.risk, *risk_labels(haystack)])),
         )
 
     def _unknown(self, reason: str) -> IntentResult:
@@ -462,12 +460,24 @@ def risk_labels(text: str) -> list[str]:
             "整个",
             "统一",
         )
+    ) or re.search(
+        r"(?<!\d)(?:[2-9]|\d{2,})\s*(?:个|位|名)\s*(?:新人|员工|同事|实习生|账号|邮箱|人)", haystack
     ):
         labels.append("batch_change")
     if any(
         word in haystack
-        for word in ("管理员", "超级用户", "root", "提权", "admin", "角色升", "升上去", "升至")
-    ):
+        for word in (
+            "管理员",
+            "超级用户",
+            "root",
+            "提权",
+            "admin",
+            "角色升",
+            "升上去",
+            "升至",
+            "审批所有人",
+        )
+    ) or re.search(r"(?:设为|改成|升为|升到|担任|授予)[^，。；]{0,12}(?:部门)?负责人", haystack):
         labels.append("grant_admin")
     if any(
         word in haystack
@@ -476,4 +486,8 @@ def risk_labels(text: str) -> list[str]:
         labels.append("destructive")
     if any(word in haystack for word in ("导出", "下载", "抄送", "发给我", "打包")):
         labels.append("data_export")
+    if any(word in haystack for word in ("工资", "身份证号", "联系方式")):
+        labels.append("sensitive_data")
+    if "维权" in haystack:
+        labels.append("rights_claim")
     return labels

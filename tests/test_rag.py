@@ -115,8 +115,9 @@ def test_normalize_collapses_whitespace():
     assert normalize("a  \n b") == "a b"
 
 
-def test_tsquery_text_dedupes_in_order():
-    assert to_tsquery_text(["a", "b", "a"]) == "a b"
+def test_document_tokens_preserve_term_frequency():
+    assert to_tsquery_text(["a", "b", "a"]) == "a b a"
+    assert to_or_tsquery(["a", "b", "a"]) == "a | b"
 
 
 # ------------------------------------------------------------------- bm25

@@ -116,25 +116,25 @@ class OfflineIndex:
         显式传 with_vector=True。真实 embedding 的融合质量由线上评测单独报告。
         """
         as_of = as_of or date.today()
-        routes: list[list[str]] = []
+        routes: dict[str, list[str]] = {}
         if with_vector:
             vector = self._vector_route(query, recall, as_of)
             if vector:
-                routes.append(vector)
+                routes["vector"] = vector
         text = self._text_route(query, recall, as_of)
         if text:
-            routes.append(text)
+            routes["text"] = text
         if not routes:
             return Ranked()
 
-        fused = rrf_fuse(routes)
+        fused = rrf_fuse(list(routes.values()))
         order = sorted(fused, key=lambda cid: (-fused[cid], cid))
         ranked = resolve_versions(
             [self._candidate(cid, fused[cid]) for cid in order],
             as_of=as_of,
             include_superseded=include_superseded,
         )
-        ranked.routes = {f"route{i}": len(route) for i, route in enumerate(routes)}
+        ranked.routes = {name: len(route) for name, route in routes.items()}
         ranked.hits = ranked.hits[:top_k]
         ranked.superseded = align_superseded(ranked.hits, ranked.superseded)
         return ranked

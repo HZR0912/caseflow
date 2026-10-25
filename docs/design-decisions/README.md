@@ -10,6 +10,14 @@
 | [0004](0004-mockcorp-oplog.md) | MockCorp 独立操作日志，失败路径也写 | 已接受 |
 | [0005](0005-policy-rag.md) | 制度知识库：按条款切块、版本是块的属性、引用必须可验证 | 已接受 |
 | [0006](0006-input-guardrails.md) | 输入护栏：规则先行、归一化只用于匹配、越权只打标签不拦 | 已接受 |
+| [0007](0007-understand-plan-preview.md) | 入职规划、DAG 与事务预演 | 已接受 |
+| [0008](0008-durable-approval.md) | 持久审批与崩溃窗口恢复 | 已接受 |
+| [0009](0009-durable-execution.md) | 加密参数、审批绑定与持久执行日志 | 已接受 |
+| [0010](0010-scoped-saga.md) | 冻结分组、收据绑定补偿与部分成功 | 已接受 |
+| [0011](0011-scoped-memory.md) | 显式分层记忆、加密会话与关系型组织目录 | 已接受 |
+| [0012](0012-observability.md) | 显式 OTel、独立持久回放与可选 Langfuse | 已接受 |
+| [0013](0013-evaluation-gate.md) | 真实收据评测、五次全通过与显式版本基线 | 已接受 |
+| [0014](0014-bounded-database-pools.md) | 有界数据库连接池、显式解锁与并发回归 | 已接受 |
 
 ## 写 ADR 的规矩
 

@@ -57,6 +57,70 @@ def test_risk_labels_are_labels_not_blocks():
 
 
 @pytest.mark.parametrize(
+    ("text", "intent"),
+    [
+        ("开个账号", "provision_employee"),
+        ("开个邮箱", "provision_employee"),
+        ("开个权限", "grant_access"),
+        ("给张三开个账号", "provision_employee"),
+        ("给李四开个邮箱", "provision_employee"),
+        ("给王五开个权限", "grant_access"),
+        ("办一下入职", "provision_employee"),
+    ],
+)
+def test_colloquial_requests_reach_slot_clarification(text, intent):
+    result = Guardrails().check(text, today=TODAY)
+    assert result.intent.intent == intent
+    assert result.intent.route == "route"
+    assert result.disposition == "clarify"  # 意图已清楚，追问缺槽，不转人工。
+
+
+@pytest.mark.parametrize(
+    ("text", "present", "absent"),
+    [
+        ("给张三开个账号", set(), {"batch_change", "grant_admin"}),
+        ("办一下入职", set(), {"batch_change"}),
+        ("帮我申请生产库只读权限", set(), {"grant_admin"}),
+        ("帮我申请管理员权限", {"grant_admin"}, set()),
+        ("权限提权到 admin", {"grant_admin"}, set()),
+        ("申请审批所有人的权限", {"grant_admin", "batch_change"}, set()),
+        ("批量办理入职", {"batch_change"}, set()),
+        ("给所有人开通账号", {"batch_change"}, set()),
+        ("给 20 个新人开个账号", {"batch_change"}, set()),
+        ("给 1 个新人开个账号", set(), {"batch_change"}),
+        ("给张三开个账号，20 个工作日后到期", set(), {"batch_change"}),
+        ("采购一个席位", {"spend_money"}, set()),
+    ],
+)
+def test_intent_and_pipeline_risks_require_text_evidence(text, present, absent):
+    intent = CLASSIFIER.classify(text)
+    result = Guardrails().check(text, today=TODAY)
+    for risks in (intent.risk, result.risk):
+        assert present <= set(risks)
+        assert not absent & set(risks)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("把我的角色设为负责人", "grant_admin"),
+        ("把我的角色改成部门负责人", "grant_admin"),
+        ("查看员工工资", "sensitive_data"),
+        ("查询身份证号", "sensitive_data"),
+        ("整理客户联系方式", "sensitive_data"),
+        ("我要劳动维权", "rights_claim"),
+    ],
+)
+def test_additional_risk_vocabulary(text, expected):
+    assert expected in risk_labels(text)
+
+
+@pytest.mark.parametrize("text", ["请部门负责人审批", "工单负责人是谁", "我要维权"])
+def test_mentions_of_responsibility_or_rights_are_not_admin_grants(text):
+    assert "grant_admin" not in risk_labels(text)
+
+
+@pytest.mark.parametrize(
     ("text", "expected"),
     [
         ("今天", date(2026, 10, 24)),

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 import psycopg
+from core.db.pools import supplier_pool
+from core.graph.contracts import Plan
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
@@ -14,6 +17,7 @@ from apps.mockcorp.domain import COLLECTIONS
 from apps.mockcorp.models import (
     AssignTickets,
     BindSeat,
+    CompensationRequest,
     CreateMailbox,
     CreateOrder,
     CreateProject,
@@ -27,6 +31,7 @@ from apps.mockcorp.models import (
     ResetPassword,
     SetPermission,
 )
+from apps.mockcorp.preview import preview_plan
 from apps.mockcorp.service import MockCorp
 from apps.mockcorp.store import PostgresStore, Store
 
@@ -74,10 +79,25 @@ def write(service, subject, options, operation, body, **path) -> JSONResponse:
 
 def create_app(store: Store | None = None, settings: MockSettings | None = None) -> FastAPI:
     config = settings or MockSettings()
-    app = FastAPI(title="MockCorp API", version="0.2.0", description="仅供虚构数据演示与故障评测")
-    app.state.mockcorp = MockCorp(
-        store or PostgresStore(get_settings().database_url, config), config
+
+    @asynccontextmanager
+    async def lifespan(app):
+        if store is not None:
+            yield
+        else:
+            url = get_settings().database_url
+            with supplier_pool(url) as pool:
+                app.state.mockcorp = MockCorp(PostgresStore(url, config, pool=pool), config)
+                yield
+
+    app = FastAPI(
+        title="MockCorp API",
+        version="0.2.0",
+        description="仅供虚构数据演示与故障评测",
+        lifespan=lifespan,
     )
+    if store is not None:
+        app.state.mockcorp = MockCorp(store, config)
 
     @app.exception_handler(psycopg.Error)
     def database_error(request: Request, exc: psycopg.Error):
@@ -94,6 +114,12 @@ def create_app(store: Store | None = None, settings: MockSettings | None = None)
     def state(subject: SubjectDep, service: ServiceDep):
         return service.store.snapshot(subject.tenant)
 
+    @app.post("/v1/preview", tags=["preview"])
+    def preview(body: Plan, subject: SubjectDep, service: ServiceDep):
+        """此入口始终是 dry-run，没有切换为执行的参数。"""
+        reply = preview_plan(service.store, subject.tenant, subject.id, body)
+        return JSONResponse(reply.body, status_code=reply.status)
+
     @app.get("/v1/oplog", tags=["inspection"])
     def oplog(
         subject: SubjectDep,
@@ -106,6 +132,21 @@ def create_app(store: Store | None = None, settings: MockSettings | None = None)
         这是**供给方视角**的事实记录：Agent 说自己做了什么，可以拿这里交叉核对。
         """
         return service.store.oplog(subject.tenant, after_id=after_id, limit=limit)
+
+    @app.post("/v1/compensations", tags=["compensation"])
+    def undo(
+        body: CompensationRequest, subject: SubjectDep, options: OptionsDep, service: ServiceDep
+    ):
+        reply = service.compensate(
+            subject.tenant,
+            body.source_key,
+            body.operation,
+            key=options.key,
+            actor=subject.id,
+            fault=options.fault,
+            dry_run=options.dry_run,
+        )
+        return JSONResponse(reply.body, status_code=reply.status, headers=reply.headers)
 
     @app.get("/v1/{system}/{collection}", tags=["inspection"])
     def listing(system: str, collection: str, subject: SubjectDep, service: ServiceDep):

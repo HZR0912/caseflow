@@ -183,6 +183,9 @@ def main() -> int:
     parser.add_argument("--json", type=Path, help="把报告写入该文件（CI 用）")
     parser.add_argument("--verbose", action="store_true", help="逐条打印处置结果")
     parser.add_argument(
+        "--report-only", action="store_true", help="仅报告，不以指标控制退出码（新留出集）"
+    )
+    parser.add_argument(
         "--cases",
         type=Path,
         default=CASES,
@@ -215,7 +218,7 @@ def main() -> int:
         args.json.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     gates = report["gates"]
-    return 0 if all(gates.values()) else 1
+    return 0 if args.report_only or all(gates.values()) else 1
 
 
 if __name__ == "__main__":

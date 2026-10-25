@@ -10,7 +10,6 @@ from sqlalchemy.engine import Engine
 def get_engine(*, echo: bool = False) -> Engine:
     """同步引擎（Alembic、脚本、W1 的 checkpoint 验证都用它）。
 
-    异步访问（FastAPI 请求路径）在 W2 引入 asyncpg / psycopg 异步池后再加，
-    现在不提前抽象。
+    长驻审批与供应方服务使用 core.db.pools 的 psycopg 池；此引擎用于独立同步脚本。
     """
     return create_engine(get_settings().database_url, pool_pre_ping=True, echo=echo)

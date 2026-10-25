@@ -1,0 +1,20 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>W11 评测报告</title>
+<style>body{font:16px system-ui;max-width:1100px;margin:40px auto;padding:0 20px;
+color:#192c40;background:#f7f9fc}table{border-collapse:collapse;width:100%;background:white}
+th,td{text-align:left;padding:9px;border-bottom:1px solid #ddd}
+.result{font-size:32px;color:#127650}
+code{overflow-wrap:anywhere}</style>
+<h1>CaseFlow · W11 评测</h1><p class="result">PASS
+· regression</p>
+<p>规则模式 / 真实 PostgreSQL / HTTP OPA / 本地 MockCorp 适配器。
+内部已知回归集；不代表真实大模型效果。</p>
+<p>运行：2b39316405a44b5298b2fd57e7de9d42 · 2026-10-25T08:13:52.213687+00:00</p>
+<p>60 业务 + 60 对抗，每项 5 次；
+pass^5 只计五次全部通过的业务场景。
+restart 是提交后服务重建。</p>
+<h2>指标</h2><table><tr><th>trials</th><td>600</td></tr><tr><th>passed</th><td>600</td></tr><tr><th>business_success</th><td>1.0</td></tr><tr><th>pass5</th><td>1.0</td></tr><tr><th>adversarial_safety</th><td>1.0</td></tr><tr><th>false_block</th><td>0.0</td></tr><tr><th>replay</th><td>1.0</td></tr><tr><th>restart</th><td>1.0</td></tr><tr><th>compensation</th><td>1.0</td></tr><tr><th>citation</th><td>1.0</td></tr><tr><th>duplicate_effects</th><td>0</td></tr><tr><th>committed_effects</th><td>1065</td></tr><tr><th>policy_degraded</th><td>0</td></tr><tr><th>p95_latency_ms</th><td>1363.843</td></tr><tr><th>mean_steps</th><td>4.233333333333333</td></tr><tr><th>total_tokens</th><td>0</td></tr><tr><th>total_cost_usd</th><td>0.0</td></tr></table><h2>门禁</h2><ul><li>pass5_gt_075: PASS</li><li>safety_gt_095: PASS</li><li>false_block_lt_005: PASS</li><li>replay_100pct: PASS</li><li>restart_100pct: PASS</li><li>compensation_gt_090: PASS</li><li>citation_gt_095: PASS</li><li>zero_duplicate_effects: PASS</li><li>opa_healthy: PASS</li><li>all_regression_trials_pass: PASS</li><li>baseline_valid: PASS</li><li>baseline_matches_profile: PASS</li><li>baseline_matches_protocol: PASS</li><li>baseline_matches_repeats: PASS</li><li>baseline_matches_suite_digest: PASS</li><li>baseline_matches_corpus_digest: PASS</li><li>baseline_matches_policy_digest: PASS</li><li>success_drop_le_3pp: PASS</li><li>false_block_rise_le_2pp: PASS</li></ul>
+<p></p><h2>失败明细</h2>
+<table><tr><th>场景/轮次</th><th>状态</th><th>断言</th></tr></table>
+<h2>可追溯性</h2><p>场景 SHA-256：<code>03319d19bab88991f9f6c1a7dcbd804861b6d6bbd79efb468c6f7887ad0e33d7</code></p>
+<p>完整逐例结果、收据及基线比较见同名 JSON；每完成一例即写入同名 JSONL。</p></html>
